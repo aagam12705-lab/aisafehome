@@ -1,7 +1,8 @@
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
-
+from src.scoring import calculate_score, get_risk_level, get_score_breakdown
 from src.ai_analysis import analyze_photo
+from src.report import generate_report
 from src.checklist import CHECKLIST_QUESTIONS, ANSWER_OPTIONS, ANSWER_VALUE_MAP
 from src.safety_text import (
     APP_NAME,
@@ -42,6 +43,18 @@ CATEGORY_LABELS = {
     "hard_to_reach_items": "Hard-to-Reach Items",
     "unclear": "Unclear Hazard",
 }
+GENERIC_RECOMMENDATIONS = {
+    "loose_rug": "Add non-slip backing, tape down rug edges, or remove the rug from the walking path.",
+    "cords": "Move cords along the wall or secure them with a cord cover.",
+    "clutter": "Clear shoes, bags, boxes, and small objects from the floor.",
+    "poor_lighting": "Add brighter lighting or night lights near walking paths.",
+    "slippery_floor": "Keep the floor dry and use non-slip mats where needed.",
+    "narrow_pathway": "Move furniture or objects to create a wider walking path.",
+    "stairs": "Keep stairs clear, improve lighting, and make step edges easy to see.",
+    "handrail": "Check that handrails are secure, easy to grip, and available where needed.",
+    "bathroom_grab_bars": "Consider properly installed grab bars near the toilet, shower, or bathtub.",
+    "hard_to_reach_items": "Move commonly used items to easy-to-reach shelves or counters.",
+}
 
 
 def setup_page():
@@ -67,6 +80,18 @@ def initialize_session_state():
 
     if "checklist_answers" not in st.session_state:
         st.session_state["checklist_answers"] = []
+
+    if "score" not in st.session_state:
+        st.session_state["score"] = None
+
+    if "risk_level" not in st.session_state:
+        st.session_state["risk_level"] = None
+
+    if "score_breakdown" not in st.session_state:
+        st.session_state["score_breakdown"] = None  
+
+    if "report_text" not in st.session_state:
+        st.session_state["report_text"] = None      
 
 
 def add_mobile_friendly_style():
@@ -250,6 +275,47 @@ def render_hazard_summary(hazards):
         st.warning("1 possible hazard found.")
     else:
         st.warning(f"{hazard_count} possible hazards found.")
+
+def get_checklist_concerns(checklist_answers):
+    """
+    Returns checklist answers that add points to the score.
+    """
+
+    concerns = []
+
+    for answer in checklist_answers:
+        if answer.get("answer") in ["yes", "not_sure"]:
+            concerns.append(answer)
+
+    return concerns
+
+
+def get_recommended_first_fixes(ai_hazards, checklist_answers):
+    """
+    Creates a short list of recommended first fixes.
+    Uses AI recommendations first, then checklist-based generic fixes.
+    """
+
+    fixes = []
+    seen_fixes = set()
+
+    for hazard in ai_hazards:
+        recommendation = hazard.get("recommendation")
+
+        if recommendation and recommendation not in seen_fixes:
+            fixes.append(recommendation)
+            seen_fixes.add(recommendation)
+
+    for answer in checklist_answers:
+        if answer.get("answer") in ["yes", "not_sure"]:
+            category = answer.get("category")
+            recommendation = GENERIC_RECOMMENDATIONS.get(category)
+
+            if recommendation and recommendation not in seen_fixes:
+                fixes.append(recommendation)
+                seen_fixes.add(recommendation)
+
+    return fixes[:5]        
 
 
 def show_landing_page():
@@ -563,13 +629,19 @@ def show_checklist_summary_page():
     for answer in checklist_answers:
         st.write(f"- **{answer['question']}** — {answer['answer_label']}")
 
-    st.info(
-        "In Milestone 8, these answers will be combined with the fake AI hazards "
-        "to calculate a 0–100 fall-risk score."
-    )
+    if st.button("Calculate Risk Score →", type="primary"):
+        ai_result = st.session_state.get("ai_result") or {}
+        hazards = ai_result.get("hazards", [])
 
-    if st.button("Continue to Risk Score →", type="primary"):
-        st.success("Risk scoring will be added in Milestone 8.")
+        score = calculate_score(hazards, checklist_answers)
+        risk_level = get_risk_level(score)
+        score_breakdown = get_score_breakdown(hazards, checklist_answers)
+
+        st.session_state["score"] = score
+        st.session_state["risk_level"] = risk_level
+        st.session_state["score_breakdown"] = score_breakdown
+
+        go_to_page("risk_score")
 
     if st.button("Edit Checklist"):
         go_to_page("checklist")
@@ -579,8 +651,198 @@ def show_checklist_summary_page():
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
         st.session_state["checklist_answers"] = []
+        st.session_state["score"] = None
+        st.session_state["risk_level"] = None
+        st.session_state["score_breakdown"] = None
         go_to_page("landing")
 
+def show_risk_score_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Step 5: Fall-Hazard Score")
+
+    score = st.session_state.get("score")
+    risk_level = st.session_state.get("risk_level")
+    score_breakdown = st.session_state.get("score_breakdown")
+
+    ai_result = st.session_state.get("ai_result") or {}
+    ai_hazards = ai_result.get("hazards", [])
+    checklist_answers = st.session_state.get("checklist_answers", [])
+
+    if score is None or risk_level is None:
+        st.error("No score was calculated yet.")
+        if st.button("Return to Checklist"):
+            go_to_page("checklist")
+        return
+
+    st.metric("Risk Score", f"{score}/100")
+
+    st.progress(score)
+
+    if risk_level == "Low Risk":
+        st.success(f"{risk_level} — Few concerns were found in this demo check.")
+    elif risk_level == "Moderate Risk":
+        st.warning(f"{risk_level} — Some concerns should be reviewed and fixed.")
+    else:
+        st.error(f"{risk_level} — Several concerns should be reviewed carefully.")
+
+    st.caption(
+        "This is an educational home-safety hazard score. "
+        "It is not a medical diagnosis and does not guarantee fall prevention."
+    )
+
+    st.subheader("Top Concerns")
+
+    checklist_concerns = get_checklist_concerns(checklist_answers)
+
+    top_concerns = []
+
+    for hazard in ai_hazards:
+        top_concerns.append(hazard.get("title", "Possible hazard"))
+
+    for answer in checklist_concerns:
+        category_label = get_category_label(answer.get("category"))
+        answer_label = answer.get("answer_label", "Concern")
+        top_concerns.append(f"{category_label} — {answer_label}")
+
+    if not top_concerns:
+        st.write("No major concerns were marked.")
+    else:
+        for index, concern in enumerate(top_concerns[:5], start=1):
+            st.write(f"{index}. {concern}")
+
+    st.subheader("Recommended First Fixes")
+
+    fixes = get_recommended_first_fixes(ai_hazards, checklist_answers)
+
+    if not fixes:
+        st.write("No specific fixes were generated.")
+    else:
+        for index, fix in enumerate(fixes, start=1):
+            st.write(f"{index}. {fix}")
+
+    with st.expander("View score breakdown"):
+        if score_breakdown:
+            st.write(f"AI hazard points: **{score_breakdown['ai_points']}**")
+            st.write(f"Checklist points: **{score_breakdown['checklist_points']}**")
+            st.write(f"Total before 100-point cap: **{score_breakdown['total_before_cap']}**")
+            st.write(f"Final score: **{score_breakdown['final_score']}/100**")
+
+            st.write("AI items that added points:")
+            if score_breakdown["ai_items"]:
+                for item in score_breakdown["ai_items"]:
+                    label = get_category_label(item["category"])
+                    st.write(f"- {item['title']} — {label}: +{item['points']}")
+            else:
+                st.write("- None")
+
+            st.write("Checklist items that added points:")
+            if score_breakdown["checklist_items"]:
+                for item in score_breakdown["checklist_items"]:
+                    label = get_category_label(item["category"])
+                    st.write(
+                        f"- {label} — {item['answer_label']}: +{item['points']}"
+                    )
+            else:
+                st.write("- None")
+
+    st.warning(
+        "AI may miss hazards. Please review the room yourself and consider asking "
+        "a qualified professional for serious safety concerns."
+    )
+
+    if st.button("Create Safety Report →", type="primary"):
+        report_text = generate_report(
+            room_type=st.session_state.get("room_type"),
+            hazards=ai_hazards,
+            checklist_answers=checklist_answers,
+            score=score,
+            risk_level=risk_level,
+            recommended_fixes=fixes,
+            safety_disclaimer=SAFETY_DISCLAIMER,
+        )
+
+        st.session_state["report_text"] = report_text
+        go_to_page("safety_report")
+
+    if st.button("Edit Checklist"):
+        go_to_page("checklist")
+
+    if st.button("Start Over"):
+        st.session_state["room_type"] = None
+        st.session_state["photo_uploaded"] = False
+        st.session_state["ai_result"] = None
+        st.session_state["checklist_answers"] = []
+        st.session_state["score"] = None
+        st.session_state["risk_level"] = None
+        st.session_state["score_breakdown"] = None
+        go_to_page("landing")        
+
+def show_safety_report_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Step 6: Safety Report")
+
+    report_text = st.session_state.get("report_text")
+    room_type = st.session_state.get("room_type")
+    score = st.session_state.get("score")
+    risk_level = st.session_state.get("risk_level")
+
+    if not report_text:
+        st.error("No safety report was created yet.")
+        if st.button("Return to Risk Score"):
+            go_to_page("risk_score")
+        return
+
+    st.success("Safety report created.")
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Room:</strong> {room_type}<br>
+            <strong>Score:</strong> {score}/100<br>
+            <strong>Risk Level:</strong> {risk_level}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.warning(
+        "This report is educational. It is not a medical diagnosis and does not guarantee fall prevention."
+    )
+
+    st.text_area(
+        "Printable report text",
+        value=report_text,
+        height=520,
+    )
+
+    st.info(
+        "In Milestone 10, we will add clearer print/save instructions for browser printing or saving as PDF."
+    )
+
+    if st.button("Back to Risk Score"):
+        go_to_page("risk_score")
+
+    if st.button("Start Another Room"):
+        st.session_state["room_type"] = None
+        st.session_state["photo_uploaded"] = False
+        st.session_state["ai_result"] = None
+        st.session_state["checklist_answers"] = []
+        st.session_state["score"] = None
+        st.session_state["risk_level"] = None
+        st.session_state["score_breakdown"] = None
+        st.session_state["report_text"] = None
+        go_to_page("room_selection")
+
+    if st.button("Start Over"):
+        st.session_state["room_type"] = None
+        st.session_state["photo_uploaded"] = False
+        st.session_state["ai_result"] = None
+        st.session_state["checklist_answers"] = []
+        st.session_state["score"] = None
+        st.session_state["risk_level"] = None
+        st.session_state["score_breakdown"] = None
+        st.session_state["report_text"] = None
+        go_to_page("landing")
 
 def main():
     setup_page()
@@ -601,6 +863,10 @@ def main():
         show_checklist_page()
     elif current_page == "checklist_summary":
         show_checklist_summary_page()
+    elif current_page == "risk_score":
+        show_risk_score_page()    
+    elif current_page == "safety_report":
+        show_safety_report_page()    
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"
