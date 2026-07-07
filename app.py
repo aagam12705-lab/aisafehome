@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image, UnidentifiedImageError
 
+from src.ai_analysis import analyze_photo
 from src.safety_text import (
     APP_NAME,
     TAGLINE,
@@ -28,10 +29,6 @@ MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 def setup_page():
-    """
-    Sets basic browser/page settings for the Streamlit app.
-    This should run before anything is displayed.
-    """
     st.set_page_config(
         page_title=APP_NAME,
         page_icon="🏠",
@@ -40,11 +37,6 @@ def setup_page():
 
 
 def initialize_session_state():
-    """
-    Streamlit reruns the app whenever the user clicks something.
-    Session state lets us remember what screen the user is on,
-    what room they selected, and whether a photo was uploaded.
-    """
     if "page" not in st.session_state:
         st.session_state["page"] = "landing"
 
@@ -54,11 +46,11 @@ def initialize_session_state():
     if "photo_uploaded" not in st.session_state:
         st.session_state["photo_uploaded"] = False
 
+    if "ai_result" not in st.session_state:
+        st.session_state["ai_result"] = None
+
 
 def add_mobile_friendly_style():
-    """
-    Adds simple CSS to make the app easier to use on iPhone.
-    """
     st.markdown(
         """
         <style>
@@ -90,7 +82,16 @@ def add_mobile_friendly_style():
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #000000;
+            background-color: #fafafa;
+        }
+
+        .hazard-card {
+            border: 1px solid #ddd;
+            border-radius: 14px;
+            padding: 1rem;
+            margin-top: 0.8rem;
+            margin-bottom: 0.8rem;
+            background-color: #ffffff;
         }
 
         div[role="radiogroup"] label {
@@ -98,7 +99,7 @@ def add_mobile_friendly_style():
             border-radius: 12px;
             padding: 0.75rem;
             margin-bottom: 0.4rem;
-            background-color: #000000;
+            background-color: #fafafa;
         }
 
         .small-muted {
@@ -112,20 +113,11 @@ def add_mobile_friendly_style():
 
 
 def go_to_page(page_name):
-    """
-    Changes the current screen.
-    """
     st.session_state["page"] = page_name
     st.rerun()
 
 
 def validate_uploaded_photo(uploaded_file):
-    """
-    Checks that the uploaded file is not too large and is a readable image.
-
-    Returns:
-        tuple: (is_valid, error_message)
-    """
     if uploaded_file is None:
         return False, "No photo was uploaded."
 
@@ -148,9 +140,6 @@ def validate_uploaded_photo(uploaded_file):
 
 
 def show_landing_page():
-    """
-    Displays the first screen of AI SafeHome.
-    """
     st.title("🏠 AI SafeHome")
 
     st.markdown(
@@ -180,9 +169,6 @@ def show_landing_page():
 
 
 def show_room_selection_page():
-    """
-    Displays the room selection screen.
-    """
     st.title("🏠 AI SafeHome")
     st.subheader("Step 1: Choose a Room")
 
@@ -209,9 +195,6 @@ def show_room_selection_page():
 
 
 def show_photo_upload_page():
-    """
-    Displays the photo upload and preview screen.
-    """
     st.title("🏠 AI SafeHome")
     st.subheader("Step 2: Upload Room Photo")
 
@@ -266,14 +249,17 @@ def show_photo_upload_page():
             """
             <p class="small-muted">
             This preview confirms the app can read the image. 
-            In the next milestone, the Analyze Photo button will return fake AI hazard results.
+            The next button will show fake AI-style hazard results.
             </p>
             """,
             unsafe_allow_html=True,
         )
 
         if st.button("Analyze Photo →", type="primary"):
-            go_to_page("analysis_placeholder")
+            with st.spinner("Analyzing photo..."):
+                ai_result = analyze_photo(uploaded_file, room_type)
+                st.session_state["ai_result"] = ai_result
+            go_to_page("ai_results")
 
     else:
         st.session_state["photo_uploaded"] = False
@@ -283,33 +269,68 @@ def show_photo_upload_page():
         go_to_page("room_selection")
 
 
-def show_analysis_placeholder_page():
-    """
-    Temporary page for Milestone 4.
-    In Milestone 5, this will show fake AI hazard results.
-    """
+def show_ai_results_page():
     st.title("🏠 AI SafeHome")
-    st.subheader("Photo Ready for Analysis")
+    st.subheader("Step 3: Possible Hazards Found")
 
+    ai_result = st.session_state.get("ai_result")
     room_type = st.session_state.get("room_type")
 
-    st.success(f"Your {room_type} photo is ready.")
+    if not ai_result:
+        st.error("No analysis result found. Please upload a photo first.")
+        if st.button("Go to Photo Upload"):
+            go_to_page("photo_upload")
+        return
 
-    st.write(
-        "In Milestone 5, this screen will show fake AI-style hazard results. "
-        "We are still not connecting real AI yet."
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Room checked:</strong> {room_type}
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    st.warning(
-        "Reminder: AI SafeHome is educational. AI may miss hazards, and human review is recommended."
+    st.info(ai_result["summary"])
+
+    hazards = ai_result.get("hazards", [])
+
+    if not hazards:
+        st.success("No obvious hazards were found in this sample result.")
+    else:
+        for hazard in hazards:
+            st.markdown(
+                f"""
+                <div class="hazard-card">
+                    <h4>{hazard["title"]}</h4>
+                    <p><strong>Why it matters:</strong><br>{hazard["explanation"]}</p>
+                    <p><strong>Suggested fix:</strong><br>{hazard["recommendation"]}</p>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+    with st.expander("What the photo may not show"):
+        for item in ai_result.get("not_visible", []):
+            st.write(f"- {item}")
+
+    st.warning(ai_result["safety_reminder"])
+
+    st.caption(
+        "Demo note: these are fake sample results. Real OpenAI vision analysis will be added later."
     )
 
-    if st.button("Upload Different Photo"):
+    if st.button("Continue to Checklist →", type="primary"):
+        st.success("Checklist will be added in Milestone 7.")
+
+    if st.button("Analyze Another Photo"):
+        st.session_state["ai_result"] = None
         go_to_page("photo_upload")
 
     if st.button("Start Over"):
         st.session_state["room_type"] = None
         st.session_state["photo_uploaded"] = False
+        st.session_state["ai_result"] = None
         go_to_page("landing")
 
 
@@ -326,8 +347,8 @@ def main():
         show_room_selection_page()
     elif current_page == "photo_upload":
         show_photo_upload_page()
-    elif current_page == "analysis_placeholder":
-        show_analysis_placeholder_page()
+    elif current_page == "ai_results":
+        show_ai_results_page()
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"
