@@ -1,4 +1,5 @@
 import streamlit as st
+from PIL import Image, UnidentifiedImageError
 
 from src.safety_text import (
     APP_NAME,
@@ -6,6 +7,8 @@ from src.safety_text import (
     LANDING_EXPLANATION,
     SAFETY_DISCLAIMER,
     PRIVACY_REMINDER,
+    PHOTO_UPLOAD_PRIVACY_WARNING,
+    PHOTO_NOT_STORED_NOTE,
 )
 
 
@@ -18,6 +21,10 @@ ROOM_OPTIONS = [
     "Stairs",
     "Other",
 ]
+
+ALLOWED_FILE_TYPES = ["jpg", "jpeg", "png", "webp"]
+MAX_FILE_SIZE_MB = 5
+MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
 def setup_page():
@@ -35,14 +42,17 @@ def setup_page():
 def initialize_session_state():
     """
     Streamlit reruns the app whenever the user clicks something.
-    Session state lets us remember what screen the user is on
-    and what room they selected.
+    Session state lets us remember what screen the user is on,
+    what room they selected, and whether a photo was uploaded.
     """
     if "page" not in st.session_state:
         st.session_state["page"] = "landing"
 
     if "room_type" not in st.session_state:
         st.session_state["room_type"] = None
+
+    if "photo_uploaded" not in st.session_state:
+        st.session_state["photo_uploaded"] = False
 
 
 def add_mobile_friendly_style():
@@ -90,6 +100,11 @@ def add_mobile_friendly_style():
             margin-bottom: 0.4rem;
             background-color: #000000;
         }
+
+        .small-muted {
+            font-size: 0.9rem;
+            color: #555;
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -104,11 +119,38 @@ def go_to_page(page_name):
     st.rerun()
 
 
+def validate_uploaded_photo(uploaded_file):
+    """
+    Checks that the uploaded file is not too large and is a readable image.
+
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if uploaded_file is None:
+        return False, "No photo was uploaded."
+
+    if uploaded_file.size > MAX_FILE_SIZE_BYTES:
+        return (
+            False,
+            f"The photo is too large. Please upload a file smaller than {MAX_FILE_SIZE_MB} MB.",
+        )
+
+    try:
+        image = Image.open(uploaded_file)
+        image.verify()
+        uploaded_file.seek(0)
+    except UnidentifiedImageError:
+        return False, "This file does not look like a valid image."
+    except Exception:
+        return False, "Something went wrong while reading the image."
+
+    return True, ""
+
+
 def show_landing_page():
     """
     Displays the first screen of AI SafeHome.
     """
-
     st.title("🏠 AI SafeHome")
 
     st.markdown(
@@ -141,7 +183,6 @@ def show_room_selection_page():
     """
     Displays the room selection screen.
     """
-
     st.title("🏠 AI SafeHome")
     st.subheader("Step 1: Choose a Room")
 
@@ -161,34 +202,114 @@ def show_room_selection_page():
     )
 
     if st.button("Continue →", type="primary"):
-        go_to_page("room_confirmed")
+        go_to_page("photo_upload")
 
     if st.button("← Back"):
         go_to_page("landing")
 
 
-def show_room_confirmed_page():
+def show_photo_upload_page():
     """
-    Temporary page for Milestone 3.
-    In Milestone 4, this will become the photo upload page.
+    Displays the photo upload and preview screen.
     """
-
     st.title("🏠 AI SafeHome")
-    st.subheader("Room Selected")
+    st.subheader("Step 2: Upload Room Photo")
 
     room_type = st.session_state.get("room_type")
 
-    st.success(f"You selected: {room_type}")
+    if not room_type:
+        st.error("No room was selected. Please choose a room first.")
+        if st.button("Choose Room"):
+            go_to_page("room_selection")
+        return
 
-    st.write(
-        "In Milestone 4, this screen will let you upload or take a room photo."
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Selected room:</strong> {room_type}
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
-    if st.button("Change Room"):
+    st.warning(PHOTO_UPLOAD_PRIVACY_WARNING)
+    st.info(PHOTO_NOT_STORED_NOTE)
+
+    uploaded_file = st.file_uploader(
+        "Upload or take a room photo",
+        type=ALLOWED_FILE_TYPES,
+        help="On iPhone, this may let you choose Photo Library or Take Photo.",
+    )
+
+    if uploaded_file is not None:
+        is_valid, error_message = validate_uploaded_photo(uploaded_file)
+
+        if not is_valid:
+            st.error(error_message)
+            st.session_state["photo_uploaded"] = False
+            return
+
+        st.session_state["photo_uploaded"] = True
+
+        st.subheader("Photo Preview")
+
+        image = Image.open(uploaded_file)
+        st.image(
+            image,
+            caption=f"Preview of uploaded {room_type} photo",
+            use_container_width=True,
+        )
+
+        st.success("Photo uploaded successfully.")
+
+        st.markdown(
+            """
+            <p class="small-muted">
+            This preview confirms the app can read the image. 
+            In the next milestone, the Analyze Photo button will return fake AI hazard results.
+            </p>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        if st.button("Analyze Photo →", type="primary"):
+            go_to_page("analysis_placeholder")
+
+    else:
+        st.session_state["photo_uploaded"] = False
+        st.info("Upload a JPG, JPEG, PNG, or WEBP photo smaller than 5 MB.")
+
+    if st.button("← Back to Room Selection"):
         go_to_page("room_selection")
+
+
+def show_analysis_placeholder_page():
+    """
+    Temporary page for Milestone 4.
+    In Milestone 5, this will show fake AI hazard results.
+    """
+    st.title("🏠 AI SafeHome")
+    st.subheader("Photo Ready for Analysis")
+
+    room_type = st.session_state.get("room_type")
+
+    st.success(f"Your {room_type} photo is ready.")
+
+    st.write(
+        "In Milestone 5, this screen will show fake AI-style hazard results. "
+        "We are still not connecting real AI yet."
+    )
+
+    st.warning(
+        "Reminder: AI SafeHome is educational. AI may miss hazards, and human review is recommended."
+    )
+
+    if st.button("Upload Different Photo"):
+        go_to_page("photo_upload")
 
     if st.button("Start Over"):
         st.session_state["room_type"] = None
+        st.session_state["photo_uploaded"] = False
         go_to_page("landing")
 
 
@@ -203,8 +324,10 @@ def main():
         show_landing_page()
     elif current_page == "room_selection":
         show_room_selection_page()
-    elif current_page == "room_confirmed":
-        show_room_confirmed_page()
+    elif current_page == "photo_upload":
+        show_photo_upload_page()
+    elif current_page == "analysis_placeholder":
+        show_analysis_placeholder_page()
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"

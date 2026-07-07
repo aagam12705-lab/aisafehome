@@ -26,3 +26,13 @@ PRIVACY_REMINDER = (
     "For privacy, do not upload photos with faces, names, addresses, mail, "
     "bills, medication bottles, or medical documents."
 )
+
+PHOTO_UPLOAD_PRIVACY_WARNING = (
+    "Before uploading, avoid including faces, names, addresses, mail, bills, "
+    "medication bottles, or medical documents in the photo."
+)
+
+PHOTO_NOT_STORED_NOTE = (
+    "Version 1 does not use a login, database, or stored photos. "
+    "Use staged, non-patient photos for testing."
+)
