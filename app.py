@@ -95,38 +95,92 @@ def initialize_session_state():
 
 
 def add_mobile_friendly_style():
+    """
+    Adds CSS that makes the Streamlit app easier to use on iPhone.
+
+    This improves:
+    - button size
+    - card spacing
+    - readable text
+    - report display
+    - print layout
+    """
+
     st.markdown(
         """
         <style>
+        html, body, [class*="css"] {
+            font-size: 17px;
+        }
+
         .block-container {
             max-width: 560px;
-            padding-top: 1.2rem;
+            padding-top: 1rem;
             padding-left: 1rem;
             padding-right: 1rem;
+            padding-bottom: 2rem;
+        }
+
+        h1 {
+            font-size: 2rem !important;
+            line-height: 1.15 !important;
+            margin-bottom: 0.5rem !important;
+        }
+
+        h2, h3 {
+            line-height: 1.25 !important;
+        }
+
+        p, li {
+            line-height: 1.45;
         }
 
         .stButton > button {
             width: 100%;
-            min-height: 52px;
+            min-height: 54px;
             font-size: 18px;
-            font-weight: 600;
-            border-radius: 12px;
+            font-weight: 700;
+            border-radius: 14px;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
+        }
+
+        .stDownloadButton > button {
+            width: 100%;
+            min-height: 54px;
+            font-size: 18px;
+            font-weight: 700;
+            border-radius: 14px;
+            margin-top: 0.25rem;
+            margin-bottom: 0.25rem;
         }
 
         .big-tagline {
             font-size: 1.35rem;
-            font-weight: 700;
+            font-weight: 800;
             line-height: 1.35;
             margin-bottom: 1rem;
         }
 
         .plain-card {
             border: 1px solid #ddd;
-            border-radius: 14px;
+            border-radius: 16px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
             background-color: #fafafa;
+            line-height: 1.45;
+        }
+
+        .step-card {
+            border: 1px solid #dcdcdc;
+            border-radius: 16px;
+            padding: 0.85rem 1rem;
+            margin-top: 0.5rem;
+            margin-bottom: 1rem;
+            background-color: #f7f7f7;
+            font-size: 0.95rem;
+            line-height: 1.4;
         }
 
         .hazard-card {
@@ -179,22 +233,32 @@ def add_mobile_friendly_style():
             border: 1px solid #ddd;
             border-radius: 14px;
             padding: 1rem;
-            margin-top: 0.8rem;
-            margin-bottom: 0.8rem;
+            margin-top: 1rem;
+            margin-bottom: 0.5rem;
             background-color: #ffffff;
+            line-height: 1.45;
         }
 
         div[role="radiogroup"] label {
             border: 1px solid #ddd;
             border-radius: 12px;
+            padding: 0.85rem;
+            margin-bottom: 0.45rem;
+            background-color: #fafafa;
+            min-height: 44px;
+        }
+
+        div[data-testid="stFileUploader"] {
+            border: 1px dashed #bbb;
+            border-radius: 16px;
             padding: 0.75rem;
-            margin-bottom: 0.4rem;
             background-color: #fafafa;
         }
 
         .small-muted {
-            font-size: 0.9rem;
+            font-size: 0.95rem;
             color: #555;
+            line-height: 1.4;
         }
 
         .print-report {
@@ -208,6 +272,8 @@ def add_mobile_friendly_style():
             line-height: 1.45;
             font-family: Arial, sans-serif;
             font-size: 0.95rem;
+            overflow-wrap: break-word;
+            word-wrap: break-word;
         }
 
         .print-step-card {
@@ -217,6 +283,46 @@ def add_mobile_friendly_style():
             margin-top: 0.75rem;
             margin-bottom: 0.75rem;
             background-color: #fafafa;
+            line-height: 1.45;
+        }
+
+        textarea {
+            font-size: 16px !important;
+        }
+
+        img {
+            border-radius: 12px;
+        }
+
+        @media screen and (max-width: 480px) {
+            .block-container {
+                padding-left: 0.85rem;
+                padding-right: 0.85rem;
+                padding-top: 0.75rem;
+            }
+
+            h1 {
+                font-size: 1.8rem !important;
+            }
+
+            .big-tagline {
+                font-size: 1.2rem;
+            }
+
+            .plain-card,
+            .hazard-card,
+            .checklist-card,
+            .print-step-card,
+            .print-report {
+                padding: 0.9rem;
+                border-radius: 14px;
+            }
+
+            .stButton > button,
+            .stDownloadButton > button {
+                min-height: 56px;
+                font-size: 17px;
+            }
         }
 
         @media print {
@@ -243,11 +349,23 @@ def add_mobile_friendly_style():
         unsafe_allow_html=True,
     )
 
-
 def go_to_page(page_name):
     st.session_state["page"] = page_name
     st.rerun()
 
+def show_step_card(step_text):
+    """
+    Shows a simple mobile-friendly step label near the top of a page.
+    """
+
+    st.markdown(
+        f"""
+        <div class="step-card">
+            {step_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 def validate_uploaded_photo(uploaded_file):
     if uploaded_file is None:
@@ -276,6 +394,11 @@ def get_category_label(category):
 
 
 def render_hazard_card(hazard, number):
+    """
+    Displays one hazard as a clean card without raw HTML.
+    This avoids Streamlit showing HTML code on the screen.
+    """
+
     title = hazard.get("title", "Possible hazard")
     category = hazard.get("category", "unclear")
     category_label = get_category_label(category)
@@ -290,22 +413,14 @@ def render_hazard_card(hazard, number):
         "Review this area carefully and consider asking a qualified professional.",
     )
 
-    st.markdown(
-        f"""
-        <div class="hazard-card">
-            <div class="hazard-number">Hazard {number}</div>
-            <div class="hazard-title">{title}</div>
-            <div class="hazard-category">{category_label}</div>
-
-            <div class="hazard-section-label">Why it matters</div>
-            <p class="hazard-text">{explanation}</p>
-
-            <div class="hazard-section-label">Suggested fix</div>
-            <p class="hazard-text">{recommendation}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with st.container(border=True):
+        st.caption(f"Hazard {number}")
+        st.subheader(title)
+        st.write(f"**Category:** {category_label}")
+        st.write("**Why it matters:**")
+        st.write(explanation)
+        st.write("**Suggested fix:**")
+        st.write(recommendation)
 
 
 def render_hazard_summary(hazards):
@@ -404,7 +519,7 @@ def show_room_selection_page():
     st.subheader("Step 1: Choose a Room")
 
     st.write("Which room are you checking today?")
-
+    show_step_card("Step 1 of 6 — Choose the room you want to check.")
     selected_room = st.radio(
         "Room type",
         ROOM_OPTIONS,
@@ -428,7 +543,7 @@ def show_room_selection_page():
 def show_photo_upload_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 2: Upload Room Photo")
-
+    show_step_card("Step 2 of 6 — Upload or take a staged room photo.")
     room_type = st.session_state.get("room_type")
 
     if not room_type:
@@ -503,7 +618,7 @@ def show_photo_upload_page():
 def show_ai_results_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 3: Possible Hazards Found")
-
+    show_step_card("Step 3 of 6 — Review possible hazards found by the sample AI.")
     ai_result = st.session_state.get("ai_result")
     room_type = st.session_state.get("room_type")
 
@@ -570,7 +685,7 @@ def show_ai_results_page():
 def show_checklist_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 4: Safety Checklist")
-
+    show_step_card("Step 4 of 6 — Answer checklist questions to add human review.")
     room_type = st.session_state.get("room_type")
     ai_result = st.session_state.get("ai_result")
 
@@ -711,7 +826,7 @@ def show_checklist_summary_page():
 def show_risk_score_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 5: Fall-Hazard Score")
-
+    show_step_card("Step 5 of 6 — Review the score, risk label, and first fixes.")
     score = st.session_state.get("score")
     risk_level = st.session_state.get("risk_level")
     score_breakdown = st.session_state.get("score_breakdown")
@@ -832,7 +947,7 @@ def show_risk_score_page():
 def show_safety_report_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 6: Safety Report")
-
+    show_step_card("Step 6 of 6 — Review, download, print, or save the report.")
     report_text = st.session_state.get("report_text")
     room_type = st.session_state.get("room_type")
     score = st.session_state.get("score")
@@ -938,7 +1053,7 @@ def show_safety_report_page():
         st.session_state["score_breakdown"] = None
         st.session_state["report_text"] = None
         go_to_page("landing")
-        
+
 def main():
     setup_page()
     initialize_session_state()
