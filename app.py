@@ -2,6 +2,7 @@ import streamlit as st
 from PIL import Image, UnidentifiedImageError
 
 from src.ai_analysis import analyze_photo
+from src.checklist import CHECKLIST_QUESTIONS, ANSWER_OPTIONS, ANSWER_VALUE_MAP
 from src.safety_text import (
     APP_NAME,
     TAGLINE,
@@ -63,6 +64,9 @@ def initialize_session_state():
 
     if "ai_result" not in st.session_state:
         st.session_state["ai_result"] = None
+
+    if "checklist_answers" not in st.session_state:
+        st.session_state["checklist_answers"] = []
 
 
 def add_mobile_friendly_style():
@@ -146,6 +150,15 @@ def add_mobile_friendly_style():
             line-height: 1.45;
         }
 
+        .checklist-card {
+            border: 1px solid #ddd;
+            border-radius: 14px;
+            padding: 1rem;
+            margin-top: 0.8rem;
+            margin-bottom: 0.8rem;
+            background-color: #ffffff;
+        }
+
         div[role="radiogroup"] label {
             border: 1px solid #ddd;
             border-radius: 12px;
@@ -192,21 +205,10 @@ def validate_uploaded_photo(uploaded_file):
 
 
 def get_category_label(category):
-    """
-    Converts an internal category like 'loose_rug'
-    into a readable label like 'Loose Rug or Mat'.
-    """
     return CATEGORY_LABELS.get(category, "Possible Hazard")
 
 
 def render_hazard_card(hazard, number):
-    """
-    Displays one hazard as a clean mobile-friendly card.
-
-    The .get() method prevents the app from crashing if a field is missing.
-    This will matter later when real AI returns JSON.
-    """
-
     title = hazard.get("title", "Possible hazard")
     category = hazard.get("category", "unclear")
     category_label = get_category_label(category)
@@ -240,10 +242,6 @@ def render_hazard_card(hazard, number):
 
 
 def render_hazard_summary(hazards):
-    """
-    Displays a short summary count before the cards.
-    """
-
     hazard_count = len(hazards)
 
     if hazard_count == 0:
@@ -436,16 +434,151 @@ def show_ai_results_page():
     )
 
     if st.button("Continue to Checklist →", type="primary"):
-        st.success("Checklist will be added in Milestone 7.")
+        go_to_page("checklist")
 
     if st.button("Analyze Another Photo"):
         st.session_state["ai_result"] = None
+        st.session_state["checklist_answers"] = []
         go_to_page("photo_upload")
 
     if st.button("Start Over"):
         st.session_state["room_type"] = None
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
+        st.session_state["checklist_answers"] = []
+        go_to_page("landing")
+
+
+def show_checklist_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Step 4: Safety Checklist")
+
+    room_type = st.session_state.get("room_type")
+    ai_result = st.session_state.get("ai_result")
+
+    if not room_type:
+        st.error("No room was selected. Please start again.")
+        if st.button("Start Over"):
+            go_to_page("landing")
+        return
+
+    if not ai_result:
+        st.error("No AI result found. Please upload and analyze a photo first.")
+        if st.button("Go to Photo Upload"):
+            go_to_page("photo_upload")
+        return
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Room checked:</strong> {room_type}<br>
+            Answer these questions based on what you can see in the room.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.info(
+        "Use the checklist to catch hazards the photo analysis may miss. "
+        "Choose 'Not sure' if you cannot tell."
+    )
+
+    checklist_answers = []
+
+    with st.form("safety_checklist_form"):
+        for question_number, question in enumerate(CHECKLIST_QUESTIONS, start=1):
+            st.markdown(
+                f"""
+                <div class="checklist-card">
+                    <strong>Question {question_number}</strong><br>
+                    {question["text"]}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            selected_answer_label = st.radio(
+                "Choose an answer",
+                ANSWER_OPTIONS,
+                index=0,
+                key=f"checklist_{question['id']}",
+                label_visibility="collapsed",
+            )
+
+            checklist_answers.append(
+                {
+                    "id": question["id"],
+                    "category": question["category"],
+                    "question": question["text"],
+                    "answer": ANSWER_VALUE_MAP[selected_answer_label],
+                    "answer_label": selected_answer_label,
+                }
+            )
+
+        submitted = st.form_submit_button("Save Checklist", type="primary")
+
+    if submitted:
+        st.session_state["checklist_answers"] = checklist_answers
+        go_to_page("checklist_summary")
+
+    if st.button("← Back to Hazard Results"):
+        go_to_page("ai_results")
+
+
+def show_checklist_summary_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Checklist Saved")
+
+    checklist_answers = st.session_state.get("checklist_answers", [])
+
+    if not checklist_answers:
+        st.error("No checklist answers were saved.")
+        if st.button("Return to Checklist"):
+            go_to_page("checklist")
+        return
+
+    yes_count = 0
+    not_sure_count = 0
+
+    for answer in checklist_answers:
+        if answer["answer"] == "yes":
+            yes_count += 1
+        elif answer["answer"] == "not_sure":
+            not_sure_count += 1
+
+    st.success("Your checklist answers were saved.")
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Checklist concerns marked Yes:</strong> {yes_count}<br>
+            <strong>Checklist items marked Not sure:</strong> {not_sure_count}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.write("Checklist answers:")
+
+    for answer in checklist_answers:
+        st.write(f"- **{answer['question']}** — {answer['answer_label']}")
+
+    st.info(
+        "In Milestone 8, these answers will be combined with the fake AI hazards "
+        "to calculate a 0–100 fall-risk score."
+    )
+
+    if st.button("Continue to Risk Score →", type="primary"):
+        st.success("Risk scoring will be added in Milestone 8.")
+
+    if st.button("Edit Checklist"):
+        go_to_page("checklist")
+
+    if st.button("Start Over"):
+        st.session_state["room_type"] = None
+        st.session_state["photo_uploaded"] = False
+        st.session_state["ai_result"] = None
+        st.session_state["checklist_answers"] = []
         go_to_page("landing")
 
 
@@ -464,6 +597,10 @@ def main():
         show_photo_upload_page()
     elif current_page == "ai_results":
         show_ai_results_page()
+    elif current_page == "checklist":
+        show_checklist_page()
+    elif current_page == "checklist_summary":
+        show_checklist_summary_page()
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"
