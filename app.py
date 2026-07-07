@@ -9,6 +9,17 @@ from src.safety_text import (
 )
 
 
+ROOM_OPTIONS = [
+    "Living Room",
+    "Bedroom",
+    "Bathroom",
+    "Kitchen",
+    "Hallway",
+    "Stairs",
+    "Other",
+]
+
+
 def setup_page():
     """
     Sets basic browser/page settings for the Streamlit app.
@@ -21,11 +32,22 @@ def setup_page():
     )
 
 
+def initialize_session_state():
+    """
+    Streamlit reruns the app whenever the user clicks something.
+    Session state lets us remember what screen the user is on
+    and what room they selected.
+    """
+    if "page" not in st.session_state:
+        st.session_state["page"] = "landing"
+
+    if "room_type" not in st.session_state:
+        st.session_state["room_type"] = None
+
+
 def add_mobile_friendly_style():
     """
     Adds simple CSS to make the app easier to use on iPhone.
-    Do not worry if you do not fully understand CSS yet.
-    This mainly makes buttons larger and spacing cleaner.
     """
     st.markdown(
         """
@@ -60,16 +82,31 @@ def add_mobile_friendly_style():
             margin-bottom: 1rem;
             background-color: #000000;
         }
+
+        div[role="radiogroup"] label {
+            border: 1px solid #ddd;
+            border-radius: 12px;
+            padding: 0.75rem;
+            margin-bottom: 0.4rem;
+            background-color: #000000;
+        }
         </style>
         """,
         unsafe_allow_html=True,
     )
 
 
+def go_to_page(page_name):
+    """
+    Changes the current screen.
+    """
+    st.session_state["page"] = page_name
+    st.rerun()
+
+
 def show_landing_page():
     """
     Displays the first screen of AI SafeHome.
-    Later, the Start button will move the user to room selection.
     """
 
     st.title("🏠 AI SafeHome")
@@ -89,25 +126,89 @@ def show_landing_page():
     )
 
     st.warning(SAFETY_DISCLAIMER)
-
     st.info(PRIVACY_REMINDER)
 
-    start_clicked = st.button("Start Safety Check", type="primary")
-
-    if start_clicked:
-        st.success(
-            "Start button works. In Milestone 3, this will take you to room selection."
-        )
+    if st.button("Start Safety Check", type="primary"):
+        go_to_page("room_selection")
 
     st.caption(
-        "Version 1 will use staged, non-patient photos only. No login. No database. No stored photos."
+        "Version 1 uses staged, non-patient photos only. "
+        "No login. No database. No stored photos."
     )
+
+
+def show_room_selection_page():
+    """
+    Displays the room selection screen.
+    """
+
+    st.title("🏠 AI SafeHome")
+    st.subheader("Step 1: Choose a Room")
+
+    st.write("Which room are you checking today?")
+
+    selected_room = st.radio(
+        "Room type",
+        ROOM_OPTIONS,
+        index=0,
+        label_visibility="collapsed",
+    )
+
+    st.session_state["room_type"] = selected_room
+
+    st.info(
+        "Choose the room that best matches the photo you will upload in the next step."
+    )
+
+    if st.button("Continue →", type="primary"):
+        go_to_page("room_confirmed")
+
+    if st.button("← Back"):
+        go_to_page("landing")
+
+
+def show_room_confirmed_page():
+    """
+    Temporary page for Milestone 3.
+    In Milestone 4, this will become the photo upload page.
+    """
+
+    st.title("🏠 AI SafeHome")
+    st.subheader("Room Selected")
+
+    room_type = st.session_state.get("room_type")
+
+    st.success(f"You selected: {room_type}")
+
+    st.write(
+        "In Milestone 4, this screen will let you upload or take a room photo."
+    )
+
+    if st.button("Change Room"):
+        go_to_page("room_selection")
+
+    if st.button("Start Over"):
+        st.session_state["room_type"] = None
+        go_to_page("landing")
 
 
 def main():
     setup_page()
+    initialize_session_state()
     add_mobile_friendly_style()
-    show_landing_page()
+
+    current_page = st.session_state["page"]
+
+    if current_page == "landing":
+        show_landing_page()
+    elif current_page == "room_selection":
+        show_room_selection_page()
+    elif current_page == "room_confirmed":
+        show_room_confirmed_page()
+    else:
+        st.error("Unknown page. Returning to landing page.")
+        st.session_state["page"] = "landing"
+        st.rerun()
 
 
 main()
