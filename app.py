@@ -28,6 +28,21 @@ MAX_FILE_SIZE_MB = 5
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
 
+CATEGORY_LABELS = {
+    "loose_rug": "Loose Rug or Mat",
+    "cords": "Cord Hazard",
+    "clutter": "Floor Clutter",
+    "poor_lighting": "Poor Lighting",
+    "slippery_floor": "Slippery or Wet Floor",
+    "narrow_pathway": "Narrow or Blocked Pathway",
+    "stairs": "Stairs or Step Hazard",
+    "handrail": "Handrail Concern",
+    "bathroom_grab_bars": "Bathroom Grab Bar Concern",
+    "hard_to_reach_items": "Hard-to-Reach Items",
+    "unclear": "Unclear Hazard",
+}
+
+
 def setup_page():
     st.set_page_config(
         page_title=APP_NAME,
@@ -86,12 +101,49 @@ def add_mobile_friendly_style():
         }
 
         .hazard-card {
-            border: 1px solid #ddd;
-            border-radius: 14px;
+            border: 1px solid #d9d9d9;
+            border-radius: 16px;
             padding: 1rem;
-            margin-top: 0.8rem;
-            margin-bottom: 0.8rem;
+            margin-top: 0.9rem;
+            margin-bottom: 0.9rem;
             background-color: #ffffff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+        }
+
+        .hazard-number {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #555;
+            margin-bottom: 0.3rem;
+        }
+
+        .hazard-title {
+            font-size: 1.15rem;
+            font-weight: 800;
+            margin-bottom: 0.4rem;
+        }
+
+        .hazard-category {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 0.25rem 0.65rem;
+            margin-bottom: 0.75rem;
+            background-color: #f1f1f1;
+            font-size: 0.85rem;
+            font-weight: 700;
+            color: #333;
+        }
+
+        .hazard-section-label {
+            font-weight: 800;
+            margin-top: 0.6rem;
+            margin-bottom: 0.15rem;
+        }
+
+        .hazard-text {
+            margin-top: 0;
+            margin-bottom: 0.5rem;
+            line-height: 1.45;
         }
 
         div[role="radiogroup"] label {
@@ -137,6 +189,69 @@ def validate_uploaded_photo(uploaded_file):
         return False, "Something went wrong while reading the image."
 
     return True, ""
+
+
+def get_category_label(category):
+    """
+    Converts an internal category like 'loose_rug'
+    into a readable label like 'Loose Rug or Mat'.
+    """
+    return CATEGORY_LABELS.get(category, "Possible Hazard")
+
+
+def render_hazard_card(hazard, number):
+    """
+    Displays one hazard as a clean mobile-friendly card.
+
+    The .get() method prevents the app from crashing if a field is missing.
+    This will matter later when real AI returns JSON.
+    """
+
+    title = hazard.get("title", "Possible hazard")
+    category = hazard.get("category", "unclear")
+    category_label = get_category_label(category)
+
+    explanation = hazard.get(
+        "explanation",
+        "This item may need review because the app could not fully explain the concern.",
+    )
+
+    recommendation = hazard.get(
+        "recommendation",
+        "Review this area carefully and consider asking a qualified professional.",
+    )
+
+    st.markdown(
+        f"""
+        <div class="hazard-card">
+            <div class="hazard-number">Hazard {number}</div>
+            <div class="hazard-title">{title}</div>
+            <div class="hazard-category">{category_label}</div>
+
+            <div class="hazard-section-label">Why it matters</div>
+            <p class="hazard-text">{explanation}</p>
+
+            <div class="hazard-section-label">Suggested fix</div>
+            <p class="hazard-text">{recommendation}</p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def render_hazard_summary(hazards):
+    """
+    Displays a short summary count before the cards.
+    """
+
+    hazard_count = len(hazards)
+
+    if hazard_count == 0:
+        st.success("No obvious hazards were found in this sample result.")
+    elif hazard_count == 1:
+        st.warning("1 possible hazard found.")
+    else:
+        st.warning(f"{hazard_count} possible hazards found.")
 
 
 def show_landing_page():
@@ -291,30 +406,30 @@ def show_ai_results_page():
         unsafe_allow_html=True,
     )
 
-    st.info(ai_result["summary"])
+    st.info(ai_result.get("summary", "Sample AI-style hazard results are shown below."))
 
     hazards = ai_result.get("hazards", [])
 
-    if not hazards:
-        st.success("No obvious hazards were found in this sample result.")
-    else:
-        for hazard in hazards:
-            st.markdown(
-                f"""
-                <div class="hazard-card">
-                    <h4>{hazard["title"]}</h4>
-                    <p><strong>Why it matters:</strong><br>{hazard["explanation"]}</p>
-                    <p><strong>Suggested fix:</strong><br>{hazard["recommendation"]}</p>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    render_hazard_summary(hazards)
+
+    for index, hazard in enumerate(hazards, start=1):
+        render_hazard_card(hazard, index)
 
     with st.expander("What the photo may not show"):
-        for item in ai_result.get("not_visible", []):
-            st.write(f"- {item}")
+        not_visible_items = ai_result.get("not_visible", [])
 
-    st.warning(ai_result["safety_reminder"])
+        if not_visible_items:
+            for item in not_visible_items:
+                st.write(f"- {item}")
+        else:
+            st.write("Some hazards may not be visible from one photo.")
+
+    st.warning(
+        ai_result.get(
+            "safety_reminder",
+            "AI may miss hazards. Human review is recommended.",
+        )
+    )
 
     st.caption(
         "Demo note: these are fake sample results. Real OpenAI vision analysis will be added later."
