@@ -196,6 +196,48 @@ def add_mobile_friendly_style():
             font-size: 0.9rem;
             color: #555;
         }
+
+        .print-report {
+            border: 1px solid #ddd;
+            border-radius: 14px;
+            padding: 1rem;
+            margin-top: 1rem;
+            margin-bottom: 1rem;
+            background-color: #ffffff;
+            white-space: pre-wrap;
+            line-height: 1.45;
+            font-family: Arial, sans-serif;
+            font-size: 0.95rem;
+        }
+
+        .print-step-card {
+            border: 1px solid #ddd;
+            border-radius: 14px;
+            padding: 1rem;
+            margin-top: 0.75rem;
+            margin-bottom: 0.75rem;
+            background-color: #fafafa;
+        }
+
+        @media print {
+            header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {
+                display: none !important;
+            }
+
+            .stButton, .stDownloadButton {
+                display: none !important;
+            }
+
+            .block-container {
+                max-width: 100%;
+                padding: 1rem;
+            }
+
+            .print-report {
+                border: none;
+                font-size: 12pt;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
@@ -315,8 +357,18 @@ def get_recommended_first_fixes(ai_hazards, checklist_answers):
                 fixes.append(recommendation)
                 seen_fixes.add(recommendation)
 
-    return fixes[:5]        
+    return fixes[:5]  
+          
+def get_report_file_name(room_type):
+    """
+    Creates a simple safe file name for the downloaded report.
+    """
 
+    if not room_type:
+        room_type = "room"
+
+    safe_room_name = room_type.lower().replace(" ", "_")
+    return f"ai_safehome_{safe_room_name}_safety_report.txt"
 
 def show_landing_page():
     st.title("🏠 AI SafeHome")
@@ -809,14 +861,57 @@ def show_safety_report_page():
         "This report is educational. It is not a medical diagnosis and does not guarantee fall prevention."
     )
 
-    st.text_area(
-        "Printable report text",
-        value=report_text,
-        height=520,
+    st.subheader("Report Preview")
+
+    st.markdown(
+        f"""
+        <div class="print-report">
+        {report_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.download_button(
+        label="Download Report as Text File",
+        data=report_text,
+        file_name=get_report_file_name(room_type),
+        mime="text/plain",
+        type="primary",
+    )
+
+    st.subheader("Print or Save Instructions")
+
+    st.markdown(
+        """
+        <div class="print-step-card">
+            <strong>On Mac or Windows:</strong><br>
+            1. Press <strong>Command + P</strong> on Mac or <strong>Ctrl + P</strong> on Windows.<br>
+            2. Choose your printer, or choose <strong>Save as PDF</strong>.<br>
+            3. Print or save the report.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        """
+        <div class="print-step-card">
+            <strong>On iPhone Safari:</strong><br>
+            1. Tap the <strong>Share</strong> button.<br>
+            2. Choose <strong>Print</strong>.<br>
+            3. Use the print preview options to save or share the report as a PDF.
+        </div>
+        """,
+        unsafe_allow_html=True,
     )
 
     st.info(
-        "In Milestone 10, we will add clearer print/save instructions for browser printing or saving as PDF."
+        "AI SafeHome does not save this report to a database. If you want to keep it, download, print, or save it yourself."
+    )
+
+    st.caption(
+        "Privacy reminder: use staged, non-patient photos only. Do not upload faces, names, addresses, mail, bills, medication bottles, or medical documents."
     )
 
     if st.button("Back to Risk Score"):
@@ -843,7 +938,7 @@ def show_safety_report_page():
         st.session_state["score_breakdown"] = None
         st.session_state["report_text"] = None
         go_to_page("landing")
-
+        
 def main():
     setup_page()
     initialize_session_state()
