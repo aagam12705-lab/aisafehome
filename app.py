@@ -96,14 +96,8 @@ def initialize_session_state():
 
 def add_mobile_friendly_style():
     """
-    Adds CSS that makes the Streamlit app easier to use on iPhone.
-
-    This improves:
-    - button size
-    - card spacing
-    - readable text
-    - report display
-    - print layout
+    Adds CSS that makes the Streamlit app easier to use on iPhone
+    and prevents black-on-black or white-on-white text problems.
     """
 
     st.markdown(
@@ -111,6 +105,13 @@ def add_mobile_friendly_style():
         <style>
         html, body, [class*="css"] {
             font-size: 17px;
+            color: #111827;
+            background-color: #ffffff;
+        }
+
+        .stApp {
+            background-color: #ffffff;
+            color: #111827;
         }
 
         .block-container {
@@ -119,6 +120,11 @@ def add_mobile_friendly_style():
             padding-left: 1rem;
             padding-right: 1rem;
             padding-bottom: 2rem;
+            color: #111827;
+        }
+
+        h1, h2, h3, h4, h5, h6 {
+            color: #111827 !important;
         }
 
         h1 {
@@ -131,8 +137,14 @@ def add_mobile_friendly_style():
             line-height: 1.25 !important;
         }
 
-        p, li {
+        p, li, span, div {
             line-height: 1.45;
+        }
+
+        .stMarkdown,
+        .stMarkdown p,
+        .stMarkdown li {
+            color: #111827;
         }
 
         .stButton > button {
@@ -160,43 +172,47 @@ def add_mobile_friendly_style():
             font-weight: 800;
             line-height: 1.35;
             margin-bottom: 1rem;
+            color: #111827;
         }
 
         .plain-card {
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 16px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #000000;
+            background-color: #f9fafb;
+            color: #111827;
             line-height: 1.45;
         }
 
         .step-card {
-            border: 1px solid #dcdcdc;
+            border: 1px solid #d1d5db;
             border-radius: 16px;
             padding: 0.85rem 1rem;
             margin-top: 0.5rem;
             margin-bottom: 1rem;
-            background-color: #000000;
+            background-color: #f3f4f6;
+            color: #111827;
             font-size: 0.95rem;
             line-height: 1.4;
         }
 
         .hazard-card {
-            border: 1px solid #d9d9d9;
+            border: 1px solid #d1d5db;
             border-radius: 16px;
             padding: 1rem;
             margin-top: 0.9rem;
             margin-bottom: 0.9rem;
-            background-color: #000000;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+            background-color: #ffffff;
+            color: #111827;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
         }
 
         .hazard-number {
             font-size: 0.9rem;
             font-weight: 700;
-            color: #555;
+            color: #374151;
             margin-bottom: 0.3rem;
         }
 
@@ -204,6 +220,7 @@ def add_mobile_friendly_style():
             font-size: 1.15rem;
             font-weight: 800;
             margin-bottom: 0.4rem;
+            color: #111827;
         }
 
         .hazard-category {
@@ -211,63 +228,77 @@ def add_mobile_friendly_style():
             border-radius: 999px;
             padding: 0.25rem 0.65rem;
             margin-bottom: 0.75rem;
-            background-color: #f1f1f1;
+            background-color: #e5e7eb;
+            color: #111827;
             font-size: 0.85rem;
             font-weight: 700;
-            color: #333;
         }
 
         .hazard-section-label {
             font-weight: 800;
             margin-top: 0.6rem;
             margin-bottom: 0.15rem;
+            color: #111827;
         }
 
         .hazard-text {
             margin-top: 0;
             margin-bottom: 0.5rem;
             line-height: 1.45;
+            color: #111827;
         }
 
         .checklist-card {
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 14px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 0.5rem;
-            background-color: #000000;
+            background-color: #ffffff;
+            color: #111827;
             line-height: 1.45;
         }
 
         div[role="radiogroup"] label {
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 12px;
             padding: 0.85rem;
             margin-bottom: 0.45rem;
-            background-color: #000000;
+            background-color: #f9fafb;
+            color: #111827;
             min-height: 44px;
         }
 
+        div[role="radiogroup"] label p {
+            color: #111827 !important;
+        }
+
         div[data-testid="stFileUploader"] {
-            border: 1px dashed #bbb;
+            border: 1px dashed #9ca3af;
             border-radius: 16px;
             padding: 0.75rem;
-            background-color: #000000;
+            background-color: #f9fafb;
+            color: #111827;
+        }
+
+        div[data-testid="stFileUploader"] * {
+            color: #111827;
         }
 
         .small-muted {
             font-size: 0.95rem;
-            color: #555;
+            color: #4b5563;
             line-height: 1.4;
         }
 
         .print-report {
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 14px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #000000;
+            background-color: #ffffff;
+            color: #111827;
             white-space: pre-wrap;
             line-height: 1.45;
             font-family: Arial, sans-serif;
@@ -277,23 +308,60 @@ def add_mobile_friendly_style():
         }
 
         .print-step-card {
-            border: 1px solid #ddd;
+            border: 1px solid #d1d5db;
             border-radius: 14px;
             padding: 1rem;
             margin-top: 0.75rem;
             margin-bottom: 0.75rem;
-            background-color: #000000;
+            background-color: #f9fafb;
+            color: #111827;
             line-height: 1.45;
         }
 
         textarea {
             font-size: 16px !important;
+            color: #111827 !important;
+            background-color: #ffffff !important;
+        }
+
+        input {
+            color: #111827 !important;
+            background-color: #ffffff !important;
         }
 
         img {
             border-radius: 12px;
         }
 
+        /* Streamlit alert boxes */
+        div[data-testid="stAlert"] {
+            color: #111827;
+        }
+
+        div[data-testid="stAlert"] * {
+            color: #111827;
+        }
+
+        /* Streamlit metric text */
+        div[data-testid="stMetric"] {
+            color: #111827;
+        }
+
+        div[data-testid="stMetric"] * {
+            color: #111827;
+        }
+
+        /* Expander text */
+        details {
+            color: #111827;
+            background-color: #ffffff;
+        }
+
+        details summary {
+            color: #111827;
+        }
+
+        /* Mobile layout */
         @media screen and (max-width: 480px) {
             .block-container {
                 padding-left: 0.85rem;
@@ -313,7 +381,8 @@ def add_mobile_friendly_style():
             .hazard-card,
             .checklist-card,
             .print-step-card,
-            .print-report {
+            .print-report,
+            .step-card {
                 padding: 0.9rem;
                 border-radius: 14px;
             }
@@ -325,6 +394,7 @@ def add_mobile_friendly_style():
             }
         }
 
+        /* Print layout */
         @media print {
             header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {
                 display: none !important;
@@ -342,13 +412,15 @@ def add_mobile_friendly_style():
             .print-report {
                 border: none;
                 font-size: 12pt;
+                color: #000000;
+                background-color: #ffffff;
             }
         }
         </style>
         """,
         unsafe_allow_html=True,
     )
-
+    
 def go_to_page(page_name):
     st.session_state["page"] = page_name
     st.rerun()
