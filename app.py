@@ -29,6 +29,44 @@ ALLOWED_FILE_TYPES = ["jpg", "jpeg", "png", "webp"]
 MAX_FILE_SIZE_MB = 5
 MAX_FILE_SIZE_BYTES = MAX_FILE_SIZE_MB * 1024 * 1024
 
+TEXT_SIZE_OPTIONS = {
+    "Normal": 17,
+    "Large": 20,
+    "Extra Large": 23,
+}
+
+COLOR_SCHEMES = {
+    "Light": {
+        "app_bg": "#ffffff",
+        "card_bg": "#f9fafb",
+        "card_bg_alt": "#ffffff",
+        "text": "#111827",
+        "muted": "#4b5563",
+        "border": "#d1d5db",
+        "pill_bg": "#e5e7eb",
+        "primary": "#2563eb",
+    },
+    "Dark": {
+        "app_bg": "#111827",
+        "card_bg": "#1f2937",
+        "card_bg_alt": "#374151",
+        "text": "#f9fafb",
+        "muted": "#d1d5db",
+        "border": "#6b7280",
+        "pill_bg": "#4b5563",
+        "primary": "#60a5fa",
+    },
+    "High Contrast": {
+        "app_bg": "#000000",
+        "card_bg": "#000000",
+        "card_bg_alt": "#111111",
+        "text": "#ffffff",
+        "muted": "#ffffff",
+        "border": "#ffffff",
+        "pill_bg": "#ffffff",
+        "primary": "#ffff00",
+    },
+}
 
 CATEGORY_LABELS = {
     "loose_rug": "Loose Rug or Mat",
@@ -91,339 +129,378 @@ def initialize_session_state():
         st.session_state["score_breakdown"] = None  
 
     if "report_text" not in st.session_state:
-        st.session_state["report_text"] = None      
+        st.session_state["report_text"] = None  
+
+    if "text_size" not in st.session_state:
+        st.session_state["text_size"] = "Normal"
+
+    if "color_scheme" not in st.session_state:
+        st.session_state["color_scheme"] = "Light"      
 
 
 def add_mobile_friendly_style():
     """
-    Adds CSS that makes the Streamlit app easier to use on iPhone
-    and prevents black-on-black or white-on-white text problems.
+    Adds CSS for:
+    - iPhone-friendly layout
+    - large tap targets
+    - accessibility text size
+    - light, dark, and high-contrast color schemes
     """
 
+    text_size_name = st.session_state.get("text_size", "Normal")
+    color_scheme_name = st.session_state.get("color_scheme", "Light")
+
+    base_font_size = TEXT_SIZE_OPTIONS.get(text_size_name, 17)
+    colors = COLOR_SCHEMES.get(color_scheme_name, COLOR_SCHEMES["Light"])
+
     st.markdown(
-        """
+        f"""
         <style>
-        html, body, [class*="css"] {
-            font-size: 17px;
-            color: #111827;
-            background-color: #ffffff;
-        }
+        html, body, [class*="css"] {{
+            font-size: {base_font_size}px;
+            color: {colors["text"]};
+            background-color: {colors["app_bg"]};
+        }}
 
-        .stApp {
-            background-color: #ffffff;
-            color: #111827;
-        }
+        .stApp {{
+            background-color: {colors["app_bg"]};
+            color: {colors["text"]};
+        }}
 
-        .block-container {
+        .block-container {{
             max-width: 560px;
             padding-top: 1rem;
             padding-left: 1rem;
             padding-right: 1rem;
             padding-bottom: 2rem;
-            color: #111827;
-        }
+            color: {colors["text"]};
+        }}
 
-        h1, h2, h3, h4, h5, h6 {
-            color: #111827 !important;
-        }
+        h1, h2, h3, h4, h5, h6 {{
+            color: {colors["text"]} !important;
+        }}
 
-        h1 {
+        h1 {{
             font-size: 2rem !important;
             line-height: 1.15 !important;
             margin-bottom: 0.5rem !important;
-        }
+        }}
 
-        h2, h3 {
+        h2, h3 {{
             line-height: 1.25 !important;
-        }
+        }}
 
-        p, li, span, div {
+        p, li, span, div {{
             line-height: 1.45;
-        }
+        }}
 
         .stMarkdown,
         .stMarkdown p,
-        .stMarkdown li {
-            color: #111827;
-        }
+        .stMarkdown li {{
+            color: {colors["text"]};
+        }}
 
-        .stButton > button {
+        .stButton > button {{
             width: 100%;
-            min-height: 54px;
-            font-size: 18px;
-            font-weight: 700;
+            min-height: 58px;
+            font-size: {base_font_size + 1}px;
+            font-weight: 800;
             border-radius: 14px;
             margin-top: 0.25rem;
             margin-bottom: 0.25rem;
-        }
+        }}
 
-        .stDownloadButton > button {
+        .stDownloadButton > button {{
             width: 100%;
-            min-height: 54px;
-            font-size: 18px;
-            font-weight: 700;
+            min-height: 58px;
+            font-size: {base_font_size + 1}px;
+            font-weight: 800;
             border-radius: 14px;
             margin-top: 0.25rem;
             margin-bottom: 0.25rem;
-        }
+        }}
 
-        .big-tagline {
+        .big-tagline {{
             font-size: 1.35rem;
             font-weight: 800;
             line-height: 1.35;
             margin-bottom: 1rem;
-            color: #111827;
-        }
+            color: {colors["text"]};
+        }}
 
-        .plain-card {
-            border: 1px solid #d1d5db;
+        .plain-card {{
+            border: 1px solid {colors["border"]};
             border-radius: 16px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #f9fafb;
-            color: #111827;
+            background-color: {colors["card_bg"]};
+            color: {colors["text"]};
             line-height: 1.45;
-        }
+        }}
 
-        .step-card {
-            border: 1px solid #d1d5db;
+        .step-card {{
+            border: 1px solid {colors["border"]};
             border-radius: 16px;
             padding: 0.85rem 1rem;
             margin-top: 0.5rem;
             margin-bottom: 1rem;
-            background-color: #f3f4f6;
-            color: #111827;
+            background-color: {colors["card_bg"]};
+            color: {colors["text"]};
             font-size: 0.95rem;
             line-height: 1.4;
-        }
+        }}
 
-        .hazard-card {
-            border: 1px solid #d1d5db;
+        .hazard-card {{
+            border: 1px solid {colors["border"]};
             border-radius: 16px;
             padding: 1rem;
             margin-top: 0.9rem;
             margin-bottom: 0.9rem;
-            background-color: #ffffff;
-            color: #111827;
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
-        }
+            background-color: {colors["card_bg_alt"]};
+            color: {colors["text"]};
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+        }}
 
-        .hazard-number {
+        .hazard-number {{
             font-size: 0.9rem;
             font-weight: 700;
-            color: #374151;
+            color: {colors["muted"]};
             margin-bottom: 0.3rem;
-        }
+        }}
 
-        .hazard-title {
+        .hazard-title {{
             font-size: 1.15rem;
             font-weight: 800;
             margin-bottom: 0.4rem;
-            color: #111827;
-        }
+            color: {colors["text"]};
+        }}
 
-        .hazard-category {
+        .hazard-category {{
             display: inline-block;
             border-radius: 999px;
             padding: 0.25rem 0.65rem;
             margin-bottom: 0.75rem;
-            background-color: #e5e7eb;
-            color: #111827;
+            background-color: {colors["pill_bg"]};
+            color: {colors["text"]};
             font-size: 0.85rem;
             font-weight: 700;
-        }
+            border: 1px solid {colors["border"]};
+        }}
 
-        .hazard-section-label {
+        .hazard-section-label {{
             font-weight: 800;
             margin-top: 0.6rem;
             margin-bottom: 0.15rem;
-            color: #111827;
-        }
+            color: {colors["text"]};
+        }}
 
-        .hazard-text {
+        .hazard-text {{
             margin-top: 0;
             margin-bottom: 0.5rem;
             line-height: 1.45;
-            color: #111827;
-        }
+            color: {colors["text"]};
+        }}
 
-        .checklist-card {
-            border: 1px solid #d1d5db;
+        .checklist-card {{
+            border: 1px solid {colors["border"]};
             border-radius: 14px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 0.5rem;
-            background-color: #ffffff;
-            color: #111827;
+            background-color: {colors["card_bg_alt"]};
+            color: {colors["text"]};
             line-height: 1.45;
-        }
+        }}
 
-        div[role="radiogroup"] label {
-            border: 1px solid #d1d5db;
+        div[role="radiogroup"] label {{
+            border: 1px solid {colors["border"]};
             border-radius: 12px;
-            padding: 0.85rem;
-            margin-bottom: 0.45rem;
-            background-color: #f9fafb;
-            color: #111827;
-            min-height: 44px;
-        }
+            padding: 0.9rem;
+            margin-bottom: 0.5rem;
+            background-color: {colors["card_bg"]};
+            color: {colors["text"]};
+            min-height: 48px;
+        }}
 
-        div[role="radiogroup"] label p {
-            color: #111827 !important;
-        }
+        div[role="radiogroup"] label p {{
+            color: {colors["text"]} !important;
+            font-size: {base_font_size}px;
+        }}
 
-        div[data-testid="stFileUploader"] {
-            border: 1px dashed #9ca3af;
+        div[data-testid="stFileUploader"] {{
+            border: 1px dashed {colors["border"]};
             border-radius: 16px;
             padding: 0.75rem;
-            background-color: #f9fafb;
-            color: #111827;
-        }
+            background-color: {colors["card_bg"]};
+            color: {colors["text"]};
+        }}
 
-        div[data-testid="stFileUploader"] * {
-            color: #111827;
-        }
+        div[data-testid="stFileUploader"] * {{
+            color: {colors["text"]};
+        }}
 
-        .small-muted {
+        .small-muted {{
             font-size: 0.95rem;
-            color: #4b5563;
+            color: {colors["muted"]};
             line-height: 1.4;
-        }
+        }}
 
-        .print-report {
-            border: 1px solid #d1d5db;
+        .print-report {{
+            border: 1px solid {colors["border"]};
             border-radius: 14px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #ffffff;
-            color: #111827;
+            background-color: {colors["card_bg_alt"]};
+            color: {colors["text"]};
             white-space: pre-wrap;
             line-height: 1.45;
             font-family: Arial, sans-serif;
             font-size: 0.95rem;
             overflow-wrap: break-word;
             word-wrap: break-word;
-        }
+        }}
 
-        .print-step-card {
-            border: 1px solid #d1d5db;
+        .print-step-card {{
+            border: 1px solid {colors["border"]};
             border-radius: 14px;
             padding: 1rem;
             margin-top: 0.75rem;
             margin-bottom: 0.75rem;
-            background-color: #f9fafb;
-            color: #111827;
+            background-color: {colors["card_bg"]};
+            color: {colors["text"]};
             line-height: 1.45;
-        }
+        }}
 
-        textarea {
-            font-size: 16px !important;
-            color: #111827 !important;
-            background-color: #ffffff !important;
-        }
+        textarea {{
+            font-size: {base_font_size}px !important;
+            color: {colors["text"]} !important;
+            background-color: {colors["card_bg_alt"]} !important;
+        }}
 
-        input {
-            color: #111827 !important;
-            background-color: #ffffff !important;
-        }
+        input {{
+            color: {colors["text"]} !important;
+            background-color: {colors["card_bg_alt"]} !important;
+        }}
 
-        img {
+        img {{
             border-radius: 12px;
-        }
+        }}
 
-        /* Streamlit alert boxes */
-        div[data-testid="stAlert"] {
-            color: #111827;
-        }
+        div[data-testid="stAlert"] {{
+            color: {colors["text"]};
+        }}
 
-        div[data-testid="stAlert"] * {
-            color: #111827;
-        }
+        div[data-testid="stAlert"] * {{
+            color: {colors["text"]};
+        }}
 
-        /* Streamlit metric text */
-        div[data-testid="stMetric"] {
-            color: #111827;
-        }
+        div[data-testid="stMetric"] {{
+            color: {colors["text"]};
+        }}
 
-        div[data-testid="stMetric"] * {
-            color: #111827;
-        }
+        div[data-testid="stMetric"] * {{
+            color: {colors["text"]};
+        }}
 
-        /* Expander text */
-        details {
-            color: #111827;
-            background-color: #ffffff;
-        }
+        details {{
+            color: {colors["text"]};
+            background-color: {colors["card_bg_alt"]};
+            border-radius: 12px;
+        }}
 
-        details summary {
-            color: #111827;
-        }
+        details summary {{
+            color: {colors["text"]};
+            font-weight: 700;
+        }}
 
-        /* Mobile layout */
-        @media screen and (max-width: 480px) {
-            .block-container {
+        @media screen and (max-width: 480px) {{
+            .block-container {{
                 padding-left: 0.85rem;
                 padding-right: 0.85rem;
                 padding-top: 0.75rem;
-            }
+            }}
 
-            h1 {
+            h1 {{
                 font-size: 1.8rem !important;
-            }
+            }}
 
-            .big-tagline {
+            .big-tagline {{
                 font-size: 1.2rem;
-            }
+            }}
 
             .plain-card,
             .hazard-card,
             .checklist-card,
             .print-step-card,
             .print-report,
-            .step-card {
+            .step-card {{
                 padding: 0.9rem;
                 border-radius: 14px;
-            }
+            }}
 
             .stButton > button,
-            .stDownloadButton > button {
-                min-height: 56px;
-                font-size: 17px;
-            }
-        }
+            .stDownloadButton > button {{
+                min-height: 60px;
+                font-size: {base_font_size + 1}px;
+            }}
+        }}
 
-        /* Print layout */
-        @media print {
-            header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {
+        @media print {{
+            header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {{
                 display: none !important;
-            }
+            }}
 
-            .stButton, .stDownloadButton {
+            .stButton, .stDownloadButton {{
                 display: none !important;
-            }
+            }}
 
-            .block-container {
+            .block-container {{
                 max-width: 100%;
                 padding: 1rem;
-            }
+            }}
 
-            .print-report {
+            .print-report {{
                 border: none;
                 font-size: 12pt;
                 color: #000000;
                 background-color: #ffffff;
-            }
-        }
+            }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
     )
-    
+
 def go_to_page(page_name):
     st.session_state["page"] = page_name
     st.rerun()
+
+def show_accessibility_panel():
+    """
+    Lets users change text size and color scheme.
+    This is especially useful for older adults or users with low vision.
+    """
+
+    with st.expander("♿ Accessibility Settings", expanded=False):
+        st.radio(
+            "Text size",
+            list(TEXT_SIZE_OPTIONS.keys()),
+            key="text_size",
+            horizontal=False,
+        )
+
+        st.radio(
+            "Color scheme",
+            list(COLOR_SCHEMES.keys()),
+            key="color_scheme",
+            horizontal=False,
+        )
+
+        st.caption(
+            "These settings only change how the app looks. They do not affect the safety score."
+        )
 
 def show_step_card(step_text):
     """
@@ -1130,6 +1207,7 @@ def main():
     setup_page()
     initialize_session_state()
     add_mobile_friendly_style()
+    show_accessibility_panel()
 
     current_page = st.session_state["page"]
 
