@@ -168,7 +168,7 @@ def add_mobile_friendly_style():
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #fafafa;
+            background-color: #000000;
             line-height: 1.45;
         }
 
@@ -178,7 +178,7 @@ def add_mobile_friendly_style():
             padding: 0.85rem 1rem;
             margin-top: 0.5rem;
             margin-bottom: 1rem;
-            background-color: #f7f7f7;
+            background-color: #000000;
             font-size: 0.95rem;
             line-height: 1.4;
         }
@@ -189,7 +189,7 @@ def add_mobile_friendly_style():
             padding: 1rem;
             margin-top: 0.9rem;
             margin-bottom: 0.9rem;
-            background-color: #ffffff;
+            background-color: #000000;
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
         }
 
@@ -235,7 +235,7 @@ def add_mobile_friendly_style():
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 0.5rem;
-            background-color: #ffffff;
+            background-color: #000000;
             line-height: 1.45;
         }
 
@@ -244,7 +244,7 @@ def add_mobile_friendly_style():
             border-radius: 12px;
             padding: 0.85rem;
             margin-bottom: 0.45rem;
-            background-color: #fafafa;
+            background-color: #000000;
             min-height: 44px;
         }
 
@@ -252,7 +252,7 @@ def add_mobile_friendly_style():
             border: 1px dashed #bbb;
             border-radius: 16px;
             padding: 0.75rem;
-            background-color: #fafafa;
+            background-color: #000000;
         }
 
         .small-muted {
@@ -267,7 +267,7 @@ def add_mobile_friendly_style():
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: #ffffff;
+            background-color: #000000;
             white-space: pre-wrap;
             line-height: 1.45;
             font-family: Arial, sans-serif;
@@ -282,7 +282,7 @@ def add_mobile_friendly_style():
             padding: 1rem;
             margin-top: 0.75rem;
             margin-bottom: 0.75rem;
-            background-color: #fafafa;
+            background-color: #000000;
             line-height: 1.45;
         }
 
