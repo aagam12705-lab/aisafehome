@@ -544,7 +544,174 @@ def add_mobile_friendly_style():
         img {{
             border-radius: 12px !important;
         }}
+        /* ===== FIX: Streamlit widget color leaks ===== */
 
+        /* File uploader outer box */
+        section[data-testid="stFileUploader"],
+        div[data-testid="stFileUploader"],
+        div[data-testid="stFileUploader"] section {
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            border-color: var(--safehome-border) !important;
+        }
+
+        /* File uploader text */
+        section[data-testid="stFileUploader"] *,
+        div[data-testid="stFileUploader"] * {
+            color: var(--safehome-text) !important;
+        }
+
+        /* File uploader browse button */
+        section[data-testid="stFileUploader"] button,
+        div[data-testid="stFileUploader"] button,
+        button[data-testid="baseButton-secondary"] {
+            background-color: var(--safehome-button-bg) !important;
+            color: var(--safehome-button-text) !important;
+            border: 2px solid var(--safehome-border) !important;
+        }
+
+        /* Text inside file uploader browse button */
+        section[data-testid="stFileUploader"] button *,
+        div[data-testid="stFileUploader"] button *,
+        button[data-testid="baseButton-secondary"] * {
+            color: var(--safehome-button-text) !important;
+        }
+
+        /* File uploader button hover */
+        section[data-testid="stFileUploader"] button:hover,
+        div[data-testid="stFileUploader"] button:hover,
+        button[data-testid="baseButton-secondary"]:hover {
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
+            border-color: var(--safehome-primary-bg) !important;
+        }
+
+        /* Help/question mark icons */
+        button[data-testid="stTooltipHoverTarget"],
+        button[data-testid="stBaseButton-headerNoPadding"],
+        span[data-testid="stTooltipIcon"] {
+            color: var(--safehome-text) !important;
+            background-color: transparent !important;
+        }
+
+        /* Help/question mark popup tooltip */
+        div[data-testid="stTooltipContent"],
+        div[data-baseweb="tooltip"],
+        div[role="tooltip"] {
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
+            border: 1px solid var(--safehome-border) !important;
+            border-radius: 10px !important;
+        }
+
+        /* Tooltip text */
+        div[data-testid="stTooltipContent"] *,
+        div[data-baseweb="tooltip"] *,
+        div[role="tooltip"] * {
+            color: var(--safehome-text) !important;
+        }
+
+        /* Expander / dropdown container */
+        div[data-testid="stExpander"],
+        details {
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            border: 1px solid var(--safehome-border) !important;
+            border-radius: 14px !important;
+        }
+
+        /* Expander closed header */
+        div[data-testid="stExpander"] summary,
+        details summary {
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            border-radius: 14px !important;
+        }
+
+        /* Expander header text and arrow */
+        div[data-testid="stExpander"] summary *,
+        details summary * {
+            color: var(--safehome-text) !important;
+            fill: var(--safehome-text) !important;
+        }
+
+        /* Expander open body */
+        div[data-testid="stExpander"] div,
+        div[data-testid="stExpander"] p,
+        div[data-testid="stExpander"] span,
+        details div,
+        details p,
+        details span {
+            color: var(--safehome-text) !important;
+        }
+
+        /* Selectbox / dropdown closed state */
+        div[data-baseweb="select"],
+        div[data-baseweb="select"] *,
+        div[data-testid="stSelectbox"],
+        div[data-testid="stSelectbox"] * {
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            border-color: var(--safehome-border) !important;
+        }
+
+        /* Dropdown menu that appears after clicking selectbox */
+        div[data-baseweb="popover"],
+        div[data-baseweb="menu"],
+        ul[role="listbox"] {
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
+            border: 1px solid var(--safehome-border) !important;
+        }
+
+        /* Dropdown menu options */
+        li[role="option"],
+        li[role="option"] *,
+        div[role="option"],
+        div[role="option"] * {
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
+        }
+
+        /* Dropdown option hover/focus */
+        li[role="option"]:hover,
+        div[role="option"]:hover,
+        li[aria-selected="true"],
+        div[aria-selected="true"] {
+            background-color: var(--safehome-primary-bg) !important;
+            color: var(--safehome-primary-text) !important;
+        }
+
+        /* Dropdown selected/hover text */
+        li[role="option"]:hover *,
+        div[role="option"]:hover *,
+        li[aria-selected="true"] *,
+        div[aria-selected="true"] * {
+            color: var(--safehome-primary-text) !important;
+        }
+
+        /* Form submit button */
+        button[data-testid="baseButton-primary"] {
+            background-color: var(--safehome-primary-bg) !important;
+            color: var(--safehome-primary-text) !important;
+            border: 2px solid var(--safehome-primary-bg) !important;
+        }
+
+        button[data-testid="baseButton-primary"] * {
+            color: var(--safehome-primary-text) !important;
+        }
+
+        /* General BaseWeb widget cleanup */
+        div[data-baseweb],
+        div[data-baseweb] * {
+            color: var(--safehome-text);
+        }
+
+        /* But keep primary button text correct */
+        button[data-testid="baseButton-primary"],
+        button[data-testid="baseButton-primary"] * {
+            color: var(--safehome-primary-text) !important;
+        }
         /* Phone layout */
         @media screen and (max-width: 480px) {{
             .block-container {{
