@@ -116,357 +116,352 @@ def initialize_session_state():
 
 def add_mobile_friendly_style():
     """
-    Adds CSS for:
-    - iPhone-friendly layout
-    - large tap targets
-    - accessibility text size
-    - system/light/dark/high-contrast color schemes
+    Strong mobile-friendly CSS for AI SafeHome.
+
+    This version forces readable colors so the app does not become
+    white-on-white or black-on-black in dark/high-contrast themes.
     """
 
-    text_size_name = st.session_state.get("text_size", "Normal")
-    color_scheme_name = st.session_state.get("color_scheme", "System")
-
-    base_font_size = TEXT_SIZE_OPTIONS.get(text_size_name, 17)
-
-    if color_scheme_name == "Light":
-        theme_variables = """
-        --safehome-app-bg: #ffffff;
-        --safehome-card-bg: #f9fafb;
-        --safehome-card-alt: #ffffff;
-        --safehome-text: #111827;
-        --safehome-muted: #4b5563;
-        --safehome-border: #d1d5db;
-        --safehome-pill-bg: #e5e7eb;
-        --safehome-primary: #2563eb;
-        --safehome-primary-text: #ffffff;
-        """
-        system_dark_css = ""
-
-    elif color_scheme_name == "Dark":
-        theme_variables = """
-        --safehome-app-bg: #111827;
-        --safehome-card-bg: #1f2937;
-        --safehome-card-alt: #374151;
-        --safehome-text: #f9fafb;
-        --safehome-muted: #d1d5db;
-        --safehome-border: #6b7280;
-        --safehome-pill-bg: #4b5563;
-        --safehome-primary: #60a5fa;
-        --safehome-primary-text: #111827;
-        """
-        system_dark_css = ""
-
-    elif color_scheme_name == "High Contrast":
-        theme_variables = """
-        --safehome-app-bg: #000000;
-        --safehome-card-bg: #000000;
-        --safehome-card-alt: #111111;
-        --safehome-text: #ffffff;
-        --safehome-muted: #ffffff;
-        --safehome-border: #ffffff;
-        --safehome-pill-bg: #ffffff;
-        --safehome-primary: #ffff00;
-        --safehome-primary-text: #000000;
-        """
-        system_dark_css = ""
-
-    else:
-        # System default starts light, then switches to dark if device/browser prefers dark.
-        theme_variables = """
-        --safehome-app-bg: #ffffff;
-        --safehome-card-bg: #f9fafb;
-        --safehome-card-alt: #ffffff;
-        --safehome-text: #111827;
-        --safehome-muted: #4b5563;
-        --safehome-border: #d1d5db;
-        --safehome-pill-bg: #e5e7eb;
-        --safehome-primary: #2563eb;
-        --safehome-primary-text: #ffffff;
-        """
-        system_dark_css = """
-        @media (prefers-color-scheme: dark) {
-            :root {
-                --safehome-app-bg: #111827;
-                --safehome-card-bg: #1f2937;
-                --safehome-card-alt: #374151;
-                --safehome-text: #f9fafb;
-                --safehome-muted: #d1d5db;
-                --safehome-border: #6b7280;
-                --safehome-pill-bg: #4b5563;
-                --safehome-primary: #60a5fa;
-                --safehome-primary-text: #111827;
-            }
-        }
-        """
-
     st.markdown(
-        f"""
+        """
         <style>
-        :root {{
-            {theme_variables}
-        }}
+        :root {
+            color-scheme: light !important;
+        }
 
-        {system_dark_css}
+        html, body, .stApp {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+        }
 
-        html, body, [class*="css"] {{
-            font-size: {base_font_size}px;
-            color: var(--safehome-text);
-            background-color: var(--safehome-app-bg);
-        }}
+        * {
+            box-sizing: border-box;
+        }
 
-        .stApp {{
-            background-color: var(--safehome-app-bg);
-            color: var(--safehome-text);
-        }}
+        .block-container {
+            max-width: 560px !important;
+            padding-top: 1rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: 2rem !important;
+            color: #111827 !important;
+        }
 
-        .block-container {{
-            max-width: 560px;
-            padding-top: 1rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
-            padding-bottom: 2rem;
-            color: var(--safehome-text);
-        }}
+        h1, h2, h3, h4, h5, h6,
+        p, li, span, div, label {
+            color: #111827 !important;
+        }
 
-        h1, h2, h3, h4, h5, h6 {{
-            color: var(--safehome-text) !important;
-        }}
-
-        h1 {{
+        h1 {
             font-size: 2rem !important;
             line-height: 1.15 !important;
             margin-bottom: 0.5rem !important;
-        }}
+        }
 
-        h2, h3 {{
+        h2, h3 {
             line-height: 1.25 !important;
-        }}
+        }
 
-        p, li, span, div {{
-            line-height: 1.45;
-        }}
+        p, li {
+            line-height: 1.45 !important;
+        }
 
-        .stMarkdown,
-        .stMarkdown p,
-        .stMarkdown li {{
-            color: var(--safehome-text);
-        }}
-
-        .stButton > button,
-        .stDownloadButton > button {{
-            width: 100%;
-            min-height: 58px;
-            font-size: {base_font_size + 1}px;
-            font-weight: 800;
-            border-radius: 14px;
-            margin-top: 0.25rem;
-            margin-bottom: 0.25rem;
-        }}
-
-        .big-tagline {{
-            font-size: 1.35rem;
-            font-weight: 800;
-            line-height: 1.35;
-            margin-bottom: 1rem;
-            color: var(--safehome-text);
-        }}
+        /* Main app cards */
+        .big-tagline {
+            font-size: 1.35rem !important;
+            font-weight: 800 !important;
+            line-height: 1.35 !important;
+            margin-bottom: 1rem !important;
+            color: #111827 !important;
+        }
 
         .plain-card,
         .step-card,
+        .hazard-card,
         .checklist-card,
-        .print-step-card {{
-            border: 1px solid var(--safehome-border);
-            border-radius: 16px;
-            padding: 1rem;
-            margin-top: 1rem;
-            margin-bottom: 1rem;
-            background-color: var(--safehome-card-bg);
-            color: var(--safehome-text);
-            line-height: 1.45;
-        }}
+        .print-report,
+        .print-step-card {
+            border: 1px solid #d1d5db !important;
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border-radius: 16px !important;
+            padding: 1rem !important;
+            margin-top: 0.9rem !important;
+            margin-bottom: 0.9rem !important;
+            line-height: 1.45 !important;
+        }
 
-        .hazard-card {{
-            border: 1px solid var(--safehome-border);
-            border-radius: 16px;
-            padding: 1rem;
-            margin-top: 0.9rem;
-            margin-bottom: 0.9rem;
-            background-color: var(--safehome-card-alt);
-            color: var(--safehome-text);
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
-        }}
+        .plain-card,
+        .step-card,
+        .print-step-card {
+            background-color: #f9fafb !important;
+        }
 
-        .hazard-number {{
-            font-size: 0.9rem;
-            font-weight: 700;
-            color: var(--safehome-muted);
-            margin-bottom: 0.3rem;
-        }}
+        .hazard-card {
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
+        }
 
-        .hazard-title {{
-            font-size: 1.15rem;
-            font-weight: 800;
-            margin-bottom: 0.4rem;
-            color: var(--safehome-text);
-        }}
+        .hazard-number {
+            font-size: 0.9rem !important;
+            font-weight: 700 !important;
+            color: #374151 !important;
+            margin-bottom: 0.3rem !important;
+        }
 
-        .hazard-category {{
-            display: inline-block;
-            border-radius: 999px;
-            padding: 0.25rem 0.65rem;
-            margin-bottom: 0.75rem;
-            background-color: var(--safehome-pill-bg);
-            color: var(--safehome-text);
-            font-size: 0.85rem;
-            font-weight: 700;
-            border: 1px solid var(--safehome-border);
-        }}
+        .hazard-title {
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            margin-bottom: 0.4rem !important;
+            color: #111827 !important;
+        }
 
-        .hazard-section-label {{
-            font-weight: 800;
-            margin-top: 0.6rem;
-            margin-bottom: 0.15rem;
-            color: var(--safehome-text);
-        }}
+        .hazard-category {
+            display: inline-block !important;
+            border-radius: 999px !important;
+            padding: 0.25rem 0.65rem !important;
+            margin-bottom: 0.75rem !important;
+            background-color: #e5e7eb !important;
+            color: #111827 !important;
+            font-size: 0.85rem !important;
+            font-weight: 700 !important;
+        }
 
-        .hazard-text {{
-            margin-top: 0;
-            margin-bottom: 0.5rem;
-            line-height: 1.45;
-            color: var(--safehome-text);
-        }}
+        .hazard-section-label {
+            font-weight: 800 !important;
+            margin-top: 0.6rem !important;
+            margin-bottom: 0.15rem !important;
+            color: #111827 !important;
+        }
 
-        div[role="radiogroup"] label {{
-            border: 1px solid var(--safehome-border);
-            border-radius: 12px;
-            padding: 0.9rem;
-            margin-bottom: 0.5rem;
-            background-color: var(--safehome-card-bg);
-            color: var(--safehome-text);
-            min-height: 48px;
-        }}
+        .hazard-text {
+            margin-top: 0 !important;
+            margin-bottom: 0.5rem !important;
+            line-height: 1.45 !important;
+            color: #111827 !important;
+        }
 
-        div[role="radiogroup"] label p {{
-            color: var(--safehome-text) !important;
-            font-size: {base_font_size}px;
-        }}
+        .small-muted {
+            font-size: 0.95rem !important;
+            color: #4b5563 !important;
+            line-height: 1.4 !important;
+        }
 
-        div[data-testid="stFileUploader"] {{
-            border: 1px dashed var(--safehome-border);
-            border-radius: 16px;
-            padding: 0.75rem;
-            background-color: var(--safehome-card-bg);
-            color: var(--safehome-text);
-        }}
+        /* Buttons */
+        div[data-testid="stButton"] > button,
+        .stButton > button,
+        button {
+            width: 100% !important;
+            min-height: 54px !important;
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            border-radius: 14px !important;
+            margin-top: 0.25rem !important;
+            margin-bottom: 0.25rem !important;
+            background-color: #f3f4f6 !important;
+            color: #111827 !important;
+            border: 1px solid #9ca3af !important;
+        }
 
-        div[data-testid="stFileUploader"] * {{
-            color: var(--safehome-text);
-        }}
+        div[data-testid="stButton"] > button:hover,
+        .stButton > button:hover,
+        button:hover {
+            background-color: #e5e7eb !important;
+            color: #111827 !important;
+            border: 1px solid #6b7280 !important;
+        }
 
-        .small-muted {{
-            font-size: 0.95rem;
-            color: var(--safehome-muted);
-            line-height: 1.4;
-        }}
+        div[data-testid="stButton"] > button[kind="primary"],
+        .stButton > button[kind="primary"] {
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            border: 1px solid #2563eb !important;
+        }
 
-        .print-report {{
-            border: 1px solid var(--safehome-border);
-            border-radius: 14px;
-            padding: 1rem;
-            margin-top: 1rem;
-            margin-bottom: 1rem;
-            background-color: var(--safehome-card-alt);
-            color: var(--safehome-text);
-            white-space: pre-wrap;
-            line-height: 1.45;
-            font-family: Arial, sans-serif;
-            font-size: 0.95rem;
-            overflow-wrap: break-word;
-            word-wrap: break-word;
-        }}
+        div[data-testid="stButton"] > button[kind="primary"]:hover,
+        .stButton > button[kind="primary"]:hover {
+            background-color: #1d4ed8 !important;
+            color: #ffffff !important;
+            border: 1px solid #1d4ed8 !important;
+        }
 
-        textarea, input {{
-            font-size: {base_font_size}px !important;
-            color: var(--safehome-text) !important;
-            background-color: var(--safehome-card-alt) !important;
-        }}
+        /* Download button */
+        div[data-testid="stDownloadButton"] > button,
+        .stDownloadButton > button {
+            width: 100% !important;
+            min-height: 54px !important;
+            font-size: 18px !important;
+            font-weight: 700 !important;
+            border-radius: 14px !important;
+            background-color: #2563eb !important;
+            color: #ffffff !important;
+            border: 1px solid #2563eb !important;
+        }
 
-        img {{
-            border-radius: 12px;
-        }}
+        div[data-testid="stDownloadButton"] > button:hover,
+        .stDownloadButton > button:hover {
+            background-color: #1d4ed8 !important;
+            color: #ffffff !important;
+        }
 
-        div[data-testid="stAlert"],
-        div[data-testid="stAlert"] *,
-        div[data-testid="stMetric"],
-        div[data-testid="stMetric"] * {{
-            color: var(--safehome-text);
-        }}
+        /* Radio buttons and labels */
+        div[role="radiogroup"] label {
+            border: 1px solid #d1d5db !important;
+            border-radius: 12px !important;
+            padding: 0.85rem !important;
+            margin-bottom: 0.45rem !important;
+            background-color: #f9fafb !important;
+            color: #111827 !important;
+            min-height: 44px !important;
+        }
 
-        details {{
-            color: var(--safehome-text);
-            background-color: var(--safehome-card-alt);
-            border-radius: 12px;
-        }}
+        div[role="radiogroup"] label:hover {
+            background-color: #e5e7eb !important;
+            color: #111827 !important;
+        }
 
-        details summary {{
-            color: var(--safehome-text);
-            font-weight: 700;
-        }}
-        
+        div[role="radiogroup"] label * {
+            color: #111827 !important;
+        }
 
-        @media screen and (max-width: 480px) {{
-            .block-container {{
-                padding-left: 0.85rem;
-                padding-right: 0.85rem;
-                padding-top: 0.75rem;
-            }}
+        div[role="radiogroup"] label p {
+            color: #111827 !important;
+        }
 
-            h1 {{
+        /* File uploader */
+        div[data-testid="stFileUploader"] {
+            border: 1px dashed #9ca3af !important;
+            border-radius: 16px !important;
+            padding: 0.75rem !important;
+            background-color: #f9fafb !important;
+            color: #111827 !important;
+        }
+
+        div[data-testid="stFileUploader"] * {
+            color: #111827 !important;
+        }
+
+        div[data-testid="stFileUploader"] button {
+            background-color: #f3f4f6 !important;
+            color: #111827 !important;
+            border: 1px solid #9ca3af !important;
+        }
+
+        div[data-testid="stFileUploader"] button:hover {
+            background-color: #e5e7eb !important;
+            color: #111827 !important;
+        }
+
+        /* Alerts */
+        div[data-testid="stAlert"] {
+            color: #111827 !important;
+        }
+
+        div[data-testid="stAlert"] * {
+            color: #111827 !important;
+        }
+
+        /* Metrics */
+        div[data-testid="stMetric"] {
+            color: #111827 !important;
+        }
+
+        div[data-testid="stMetric"] * {
+            color: #111827 !important;
+        }
+
+        /* Expanders */
+        details {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border-radius: 12px !important;
+        }
+
+        details summary {
+            color: #111827 !important;
+        }
+
+        details * {
+            color: #111827 !important;
+        }
+
+        /* Text inputs / report boxes */
+        textarea,
+        input {
+            background-color: #ffffff !important;
+            color: #111827 !important;
+            border: 1px solid #d1d5db !important;
+            font-size: 16px !important;
+        }
+
+        .print-report {
+            white-space: pre-wrap !important;
+            font-family: Arial, sans-serif !important;
+            font-size: 0.95rem !important;
+            overflow-wrap: break-word !important;
+            word-wrap: break-word !important;
+        }
+
+        img {
+            border-radius: 12px !important;
+        }
+
+        /* Mobile layout */
+        @media screen and (max-width: 480px) {
+            .block-container {
+                padding-left: 0.85rem !important;
+                padding-right: 0.85rem !important;
+                padding-top: 0.75rem !important;
+            }
+
+            h1 {
                 font-size: 1.8rem !important;
-            }}
+            }
 
-            .big-tagline {{
-                font-size: 1.2rem;
-            }}
+            .big-tagline {
+                font-size: 1.2rem !important;
+            }
 
             .plain-card,
             .hazard-card,
             .checklist-card,
             .print-step-card,
             .print-report,
-            .step-card {{
-                padding: 0.9rem;
-                border-radius: 14px;
-            }}
+            .step-card {
+                padding: 0.9rem !important;
+                border-radius: 14px !important;
+            }
 
+            div[data-testid="stButton"] > button,
             .stButton > button,
-            .stDownloadButton > button {{
-                min-height: 60px;
-                font-size: {base_font_size + 1}px;
-            }}
-        }}
+            div[data-testid="stDownloadButton"] > button,
+            .stDownloadButton > button {
+                min-height: 56px !important;
+                font-size: 17px !important;
+            }
+        }
 
-        @media print {{
-            header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {{
+        /* Print layout */
+        @media print {
+            header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {
                 display: none !important;
-            }}
+            }
 
-            .stButton, .stDownloadButton {{
+            .stButton, .stDownloadButton {
                 display: none !important;
-            }}
+            }
 
-            .block-container {{
-                max-width: 100%;
-                padding: 1rem;
-            }}
+            .block-container {
+                max-width: 100% !important;
+                padding: 1rem !important;
+            }
 
-            .print-report {{
-                border: none;
-                font-size: 12pt;
-                color: #000000;
-                background-color: #ffffff;
-            }}
-        }}
+            .print-report {
+                border: none !important;
+                font-size: 12pt !important;
+                color: #000000 !important;
+                background-color: #ffffff !important;
+            }
+        }
         </style>
         """,
         unsafe_allow_html=True,
