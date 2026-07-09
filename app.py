@@ -116,85 +116,120 @@ def initialize_session_state():
     if "show_accessibility_panel" not in st.session_state:
         st.session_state["show_accessibility_panel"] = False   
 
+
 def add_mobile_friendly_style():
     """
-    Clean accessibility-aware style system for AI SafeHome.
+    Accessibility-aware style system for AI SafeHome.
 
-    Supports:
-    - System theme
-    - Light theme
-    - Dark theme
-    - High Contrast theme
-    - Normal / Large / Extra Large text
-    - iPhone-friendly buttons and spacing
+    Fixes the color-scheme problems by using one set of CSS variables for
+    every card, button, radio button, alert, input, uploader, expander, and
+    report area. This prevents black-on-black and white-on-white text.
     """
 
     text_size_name = st.session_state.get("text_size", "Normal")
     color_scheme_name = st.session_state.get("color_scheme", "System")
 
-    text_sizes = {
-        "Normal": 17,
-        "Large": 20,
-        "Extra Large": 23,
-    }
+    base_font_size = TEXT_SIZE_OPTIONS.get(text_size_name, 17)
 
-    base_font_size = text_sizes.get(text_size_name, 17)
-
-    # CSS variable sets
     light_vars = """
         --safehome-bg: #ffffff;
-        --safehome-card: #f9fafb;
-        --safehome-card-2: #ffffff;
+        --safehome-surface: #f8fafc;
+        --safehome-card: #ffffff;
+        --safehome-card-alt: #f9fafb;
         --safehome-text: #111827;
-        --safehome-muted: #4b5563;
-        --safehome-border: #d1d5db;
-        --safehome-button-bg: #f9fafb;
-        --safehome-button-text: #111827;
+        --safehome-muted: #374151;
+        --safehome-border: #9ca3af;
+        --safehome-soft-border: #d1d5db;
+
         --safehome-primary-bg: #2563eb;
         --safehome-primary-text: #ffffff;
+        --safehome-button-bg: #ffffff;
+        --safehome-button-text: #111827;
+        --safehome-button-hover-bg: #f3f4f6;
+
+        --safehome-input-bg: #ffffff;
+        --safehome-input-text: #111827;
         --safehome-pill-bg: #e5e7eb;
+        --safehome-pill-text: #111827;
+
+        --safehome-alert-bg: #f8fafc;
+        --safehome-alert-text: #111827;
+        --safehome-alert-border: #64748b;
+
+        --safehome-shadow: rgba(0, 0, 0, 0.08);
     """
 
     dark_vars = """
-        --safehome-bg: #111827;
+        --safehome-bg: #0b1220;
+        --safehome-surface: #111827;
         --safehome-card: #1f2937;
-        --safehome-card-2: #374151;
+        --safehome-card-alt: #273449;
         --safehome-text: #f9fafb;
-        --safehome-muted: #d1d5db;
-        --safehome-border: #6b7280;
-        --safehome-button-bg: #1f2937;
+        --safehome-muted: #e5e7eb;
+        --safehome-border: #94a3b8;
+        --safehome-soft-border: #64748b;
+
+        --safehome-primary-bg: #93c5fd;
+        --safehome-primary-text: #07111f;
+        --safehome-button-bg: #111827;
         --safehome-button-text: #f9fafb;
-        --safehome-primary-bg: #60a5fa;
-        --safehome-primary-text: #111827;
-        --safehome-pill-bg: #4b5563;
+        --safehome-button-hover-bg: #374151;
+
+        --safehome-input-bg: #111827;
+        --safehome-input-text: #f9fafb;
+        --safehome-pill-bg: #334155;
+        --safehome-pill-text: #f9fafb;
+
+        --safehome-alert-bg: #111827;
+        --safehome-alert-text: #f9fafb;
+        --safehome-alert-border: #93c5fd;
+
+        --safehome-shadow: rgba(0, 0, 0, 0.35);
     """
 
     high_contrast_vars = """
         --safehome-bg: #000000;
+        --safehome-surface: #000000;
         --safehome-card: #000000;
-        --safehome-card-2: #111111;
+        --safehome-card-alt: #000000;
         --safehome-text: #ffffff;
         --safehome-muted: #ffffff;
         --safehome-border: #ffffff;
-        --safehome-button-bg: #000000;
-        --safehome-button-text: #ffffff;
+        --safehome-soft-border: #ffffff;
+
         --safehome-primary-bg: #ffff00;
         --safehome-primary-text: #000000;
+        --safehome-button-bg: #000000;
+        --safehome-button-text: #ffffff;
+        --safehome-button-hover-bg: #1a1a1a;
+
+        --safehome-input-bg: #000000;
+        --safehome-input-text: #ffffff;
         --safehome-pill-bg: #000000;
+        --safehome-pill-text: #ffffff;
+
+        --safehome-alert-bg: #000000;
+        --safehome-alert-text: #ffffff;
+        --safehome-alert-border: #ffff00;
+
+        --safehome-shadow: rgba(255, 255, 255, 0.25);
     """
 
     if color_scheme_name == "Light":
         root_vars = light_vars
         system_dark_override = ""
+        browser_color_scheme = "light"
     elif color_scheme_name == "Dark":
         root_vars = dark_vars
         system_dark_override = ""
+        browser_color_scheme = "dark"
     elif color_scheme_name == "High Contrast":
         root_vars = high_contrast_vars
         system_dark_override = ""
+        browser_color_scheme = "dark"
     else:
-        # System default: light first, then dark if device/browser prefers dark.
         root_vars = light_vars
+        browser_color_scheme = "light dark"
         system_dark_override = f"""
         @media (prefers-color-scheme: dark) {{
             :root {{
@@ -208,11 +243,11 @@ def add_mobile_friendly_style():
         <style>
         :root {{
             {root_vars}
+            color-scheme: {browser_color_scheme};
         }}
 
         {system_dark_override}
 
-        /* Main app background and text */
         html,
         body,
         .stApp,
@@ -229,20 +264,20 @@ def add_mobile_friendly_style():
         }}
 
         .block-container {{
-            max-width: 560px;
-            padding-top: 1rem;
-            padding-left: 1rem;
-            padding-right: 1rem;
-            padding-bottom: 2rem;
+            max-width: 560px !important;
+            padding-top: 1rem !important;
+            padding-left: 1rem !important;
+            padding-right: 1rem !important;
+            padding-bottom: 2rem !important;
             color: var(--safehome-text) !important;
         }}
 
-        /* Global readable text */
+        /* Main readable text */
         h1, h2, h3, h4, h5, h6,
-        p, li, span, div,
-        .stMarkdown,
-        .stMarkdown p,
-        .stMarkdown li {{
+        p, li, span, div, label,
+        .stMarkdown, .stMarkdown p, .stMarkdown li,
+        [data-testid="stMarkdownContainer"],
+        [data-testid="stMarkdownContainer"] * {{
             color: var(--safehome-text) !important;
         }}
 
@@ -260,20 +295,17 @@ def add_mobile_friendly_style():
             line-height: 1.45 !important;
         }}
 
-        /* Accessibility panel label */
-        .accessibility-label {{
-            font-size: 1.05rem !important;
-            font-weight: 800 !important;
-            color: var(--safehome-text) !important;
-            margin-top: 1rem;
-            margin-bottom: 0.35rem;
+        a, a * {{
+            color: var(--safehome-primary-bg) !important;
         }}
 
-        /* Cards */
+        /* Custom app cards */
         .plain-card,
         .step-card,
         .checklist-card,
-        .print-step-card {{
+        .print-step-card,
+        .hazard-card,
+        .print-report {{
             border: 1px solid var(--safehome-border) !important;
             border-radius: 16px !important;
             padding: 1rem !important;
@@ -282,20 +314,14 @@ def add_mobile_friendly_style():
             background-color: var(--safehome-card) !important;
             color: var(--safehome-text) !important;
             line-height: 1.45 !important;
-        }}
-
-        .hazard-card,
-        .print-report {{
-            border: 1px solid var(--safehome-border) !important;
-            border-radius: 16px !important;
-            padding: 1rem !important;
-            margin-top: 0.9rem !important;
-            margin-bottom: 0.9rem !important;
-            background-color: var(--safehome-card-2) !important;
-            color: var(--safehome-text) !important;
-            line-height: 1.45 !important;
             overflow-wrap: break-word !important;
             word-wrap: break-word !important;
+        }}
+
+        .step-card,
+        .checklist-card,
+        .print-step-card {{
+            background-color: var(--safehome-card-alt) !important;
         }}
 
         .print-report {{
@@ -312,56 +338,63 @@ def add_mobile_friendly_style():
             color: var(--safehome-text) !important;
         }}
 
-        .small-muted {{
+        .small-muted,
+        .stCaptionContainer,
+        .stCaptionContainer * {{
             font-size: 0.95rem !important;
             color: var(--safehome-muted) !important;
             line-height: 1.4 !important;
         }}
 
-        /* Hazard card details */
-        .hazard-number {{
-            font-size: 0.9rem !important;
-            font-weight: 700 !important;
-            color: var(--safehome-muted) !important;
-            margin-bottom: 0.3rem !important;
-        }}
-
-        .hazard-title {{
-            font-size: 1.15rem !important;
+        .accessibility-label {{
+            font-size: 1.05rem !important;
             font-weight: 800 !important;
-            margin-bottom: 0.4rem !important;
+            color: var(--safehome-text) !important;
+            margin-top: 1rem !important;
+            margin-bottom: 0.35rem !important;
+        }}
+
+        /* Streamlit containers, expanders, and bordered containers */
+        [data-testid="stVerticalBlockBorderWrapper"],
+        [data-testid="stExpander"],
+        details {{
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            border-color: var(--safehome-border) !important;
+            border-radius: 14px !important;
+        }}
+
+        [data-testid="stExpander"] *,
+        details *,
+        details summary {{
             color: var(--safehome-text) !important;
         }}
 
-        .hazard-category {{
-            display: inline-block !important;
-            border-radius: 999px !important;
-            padding: 0.25rem 0.65rem !important;
-            margin-bottom: 0.75rem !important;
-            background-color: var(--safehome-pill-bg) !important;
-            color: var(--safehome-text) !important;
-            font-size: 0.85rem !important;
-            font-weight: 700 !important;
-            border: 1px solid var(--safehome-border) !important;
+        /* Alerts: override Streamlit's pale alert backgrounds so dark/high-contrast text stays readable */
+        div[data-testid="stAlert"] {{
+            background-color: var(--safehome-alert-bg) !important;
+            color: var(--safehome-alert-text) !important;
+            border: 2px solid var(--safehome-alert-border) !important;
+            border-radius: 14px !important;
         }}
 
-        .hazard-section-label {{
-            font-weight: 800 !important;
-            margin-top: 0.6rem !important;
-            margin-bottom: 0.15rem !important;
-            color: var(--safehome-text) !important;
+        div[data-testid="stAlert"] * {{
+            color: var(--safehome-alert-text) !important;
         }}
 
-        .hazard-text {{
-            margin-top: 0 !important;
-            margin-bottom: 0.5rem !important;
-            line-height: 1.45 !important;
+        /* Metrics */
+        div[data-testid="stMetric"],
+        div[data-testid="stMetric"] *,
+        div[data-testid="stMetricValue"],
+        div[data-testid="stMetricLabel"] {{
             color: var(--safehome-text) !important;
         }}
 
-        /* Buttons: readable in every theme */
+        /* Buttons */
         .stButton > button,
-        .stDownloadButton > button {{
+        .stDownloadButton > button,
+        button[data-testid="baseButton-secondary"],
+        button[data-testid="baseButton-primary"] {{
             width: 100% !important;
             min-height: 58px !important;
             font-size: {base_font_size + 1}px !important;
@@ -375,25 +408,31 @@ def add_mobile_friendly_style():
         }}
 
         .stButton > button *,
-        .stDownloadButton > button * {{
-            color: var(--safehome-button-text) !important;
+        .stDownloadButton > button *,
+        button[data-testid="baseButton-secondary"] *,
+        button[data-testid="baseButton-primary"] * {{
+            color: inherit !important;
         }}
 
         .stButton > button:hover,
-        .stDownloadButton > button:hover {{
-            filter: brightness(1.08) !important;
-            border: 2px solid var(--safehome-primary-bg) !important;
+        .stDownloadButton > button:hover,
+        button[data-testid="baseButton-secondary"]:hover,
+        button[data-testid="baseButton-primary"]:hover {{
+            background-color: var(--safehome-button-hover-bg) !important;
+            border-color: var(--safehome-primary-bg) !important;
         }}
 
         .stButton > button[kind="primary"],
-        .stDownloadButton > button[kind="primary"] {{
+        .stDownloadButton > button[kind="primary"],
+        button[data-testid="baseButton-primary"] {{
             background-color: var(--safehome-primary-bg) !important;
             color: var(--safehome-primary-text) !important;
             border: 2px solid var(--safehome-primary-bg) !important;
         }}
 
         .stButton > button[kind="primary"] *,
-        .stDownloadButton > button[kind="primary"] * {{
+        .stDownloadButton > button[kind="primary"] *,
+        button[data-testid="baseButton-primary"] * {{
             color: var(--safehome-primary-text) !important;
         }}
 
@@ -419,60 +458,94 @@ def add_mobile_friendly_style():
             min-height: 48px !important;
         }}
 
+        div[data-testid="stRadio"] label:hover {{
+            background-color: var(--safehome-card-alt) !important;
+            border-color: var(--safehome-primary-bg) !important;
+        }}
+
         div[data-testid="stRadio"] label p {{
             color: var(--safehome-text) !important;
             font-size: {base_font_size}px !important;
-            font-weight: 600 !important;
+            font-weight: 650 !important;
         }}
 
-        /* File uploader */
-        div[data-testid="stFileUploader"] {{
-            border: 1px dashed var(--safehome-border) !important;
+        /* Inputs, text areas, uploader */
+        textarea,
+        input,
+        [data-baseweb="input"],
+        [data-baseweb="textarea"] {{
+            font-size: {base_font_size}px !important;
+            color: var(--safehome-input-text) !important;
+            background-color: var(--safehome-input-bg) !important;
+            border-color: var(--safehome-border) !important;
+        }}
+
+        textarea::placeholder,
+        input::placeholder {{
+            color: var(--safehome-muted) !important;
+        }}
+
+        div[data-testid="stFileUploader"],
+        section[data-testid="stFileUploaderDropzone"],
+        [data-testid="stFileUploaderDropzone"] {{
+            border-color: var(--safehome-border) !important;
             border-radius: 16px !important;
-            padding: 0.75rem !important;
             background-color: var(--safehome-card) !important;
             color: var(--safehome-text) !important;
         }}
 
-        div[data-testid="stFileUploader"] * {{
+        div[data-testid="stFileUploader"] *,
+        section[data-testid="stFileUploaderDropzone"] *,
+        [data-testid="stFileUploaderDropzone"] * {{
             color: var(--safehome-text) !important;
         }}
 
-        /* Text areas and inputs */
-        textarea,
-        input {{
-            font-size: {base_font_size}px !important;
-            color: var(--safehome-text) !important;
-            background-color: var(--safehome-card-2) !important;
-            border-color: var(--safehome-border) !important;
-        }}
-
-        /* Alerts, metrics, expanders */
-        div[data-testid="stAlert"],
-        div[data-testid="stAlert"] *,
-        div[data-testid="stMetric"],
-        div[data-testid="stMetric"] *,
-        .stCaptionContainer,
-        .stCaptionContainer * {{
-            color: var(--safehome-text) !important;
-        }}
-
-        details {{
-            color: var(--safehome-text) !important;
-            background-color: var(--safehome-card-2) !important;
-            border-radius: 12px !important;
-        }}
-
-        details summary {{
-            color: var(--safehome-text) !important;
+        /* Hazard card details */
+        .hazard-number {{
+            font-size: 0.9rem !important;
             font-weight: 700 !important;
+            color: var(--safehome-muted) !important;
+            margin-bottom: 0.3rem !important;
+        }}
+
+        .hazard-title {{
+            font-size: 1.15rem !important;
+            font-weight: 800 !important;
+            margin-bottom: 0.4rem !important;
+            color: var(--safehome-text) !important;
+        }}
+
+        .hazard-category {{
+            display: inline-block !important;
+            border-radius: 999px !important;
+            padding: 0.25rem 0.65rem !important;
+            margin-bottom: 0.75rem !important;
+            background-color: var(--safehome-pill-bg) !important;
+            color: var(--safehome-pill-text) !important;
+            font-size: 0.85rem !important;
+            font-weight: 700 !important;
+            border: 1px solid var(--safehome-border) !important;
+        }}
+
+        .hazard-section-label {{
+            font-weight: 800 !important;
+            margin-top: 0.6rem !important;
+            margin-bottom: 0.15rem !important;
+            color: var(--safehome-text) !important;
+        }}
+
+        .hazard-text {{
+            margin-top: 0 !important;
+            margin-bottom: 0.5rem !important;
+            line-height: 1.45 !important;
+            color: var(--safehome-text) !important;
         }}
 
         img {{
             border-radius: 12px !important;
         }}
 
-        /* Mobile */
+        /* Phone layout */
         @media screen and (max-width: 480px) {{
             .block-container {{
                 padding-left: 0.85rem !important;
@@ -499,13 +572,15 @@ def add_mobile_friendly_style():
             }}
 
             .stButton > button,
-            .stDownloadButton > button {{
+            .stDownloadButton > button,
+            button[data-testid="baseButton-secondary"],
+            button[data-testid="baseButton-primary"] {{
                 min-height: 60px !important;
                 font-size: {base_font_size + 1}px !important;
             }}
         }}
 
-        /* Print */
+        /* Print mode */
         @media print {{
             header,
             footer,
@@ -532,7 +607,7 @@ def add_mobile_friendly_style():
         """,
         unsafe_allow_html=True,
     )
-    
+
 def go_to_page(page_name):
     st.session_state["page"] = page_name
     st.rerun()
