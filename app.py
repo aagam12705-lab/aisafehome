@@ -116,357 +116,421 @@ def initialize_session_state():
 
 def add_mobile_friendly_style():
     """
-    Strong mobile-friendly CSS for AI SafeHome.
+    Clean accessibility-aware style system for AI SafeHome.
 
-    This version forces readable colors so the app does not become
-    white-on-white or black-on-black in dark/high-contrast themes.
+    Supports:
+    - System theme
+    - Light theme
+    - Dark theme
+    - High Contrast theme
+    - Normal / Large / Extra Large text
+    - iPhone-friendly buttons and spacing
     """
 
-    st.markdown(
+    text_size_name = st.session_state.get("text_size", "Normal")
+    color_scheme_name = st.session_state.get("color_scheme", "System")
+
+    text_sizes = {
+        "Normal": 17,
+        "Large": 20,
+        "Extra Large": 23,
+    }
+
+    base_font_size = text_sizes.get(text_size_name, 17)
+
+    # CSS variable sets
+    light_vars = """
+        --safehome-bg: #ffffff;
+        --safehome-card: #f9fafb;
+        --safehome-card-2: #ffffff;
+        --safehome-text: #111827;
+        --safehome-muted: #4b5563;
+        --safehome-border: #d1d5db;
+        --safehome-button-bg: #f9fafb;
+        --safehome-button-text: #111827;
+        --safehome-primary-bg: #2563eb;
+        --safehome-primary-text: #ffffff;
+        --safehome-pill-bg: #e5e7eb;
+    """
+
+    dark_vars = """
+        --safehome-bg: #111827;
+        --safehome-card: #1f2937;
+        --safehome-card-2: #374151;
+        --safehome-text: #f9fafb;
+        --safehome-muted: #d1d5db;
+        --safehome-border: #6b7280;
+        --safehome-button-bg: #1f2937;
+        --safehome-button-text: #f9fafb;
+        --safehome-primary-bg: #60a5fa;
+        --safehome-primary-text: #111827;
+        --safehome-pill-bg: #4b5563;
+    """
+
+    high_contrast_vars = """
+        --safehome-bg: #000000;
+        --safehome-card: #000000;
+        --safehome-card-2: #111111;
+        --safehome-text: #ffffff;
+        --safehome-muted: #ffffff;
+        --safehome-border: #ffffff;
+        --safehome-button-bg: #000000;
+        --safehome-button-text: #ffffff;
+        --safehome-primary-bg: #ffff00;
+        --safehome-primary-text: #000000;
+        --safehome-pill-bg: #000000;
+    """
+
+    if color_scheme_name == "Light":
+        root_vars = light_vars
+        system_dark_override = ""
+    elif color_scheme_name == "Dark":
+        root_vars = dark_vars
+        system_dark_override = ""
+    elif color_scheme_name == "High Contrast":
+        root_vars = high_contrast_vars
+        system_dark_override = ""
+    else:
+        # System default: light first, then dark if device/browser prefers dark.
+        root_vars = light_vars
+        system_dark_override = f"""
+        @media (prefers-color-scheme: dark) {{
+            :root {{
+                {dark_vars}
+            }}
+        }}
         """
+
+    st.markdown(
+        f"""
         <style>
-        :root {
-            color-scheme: light !important;
-        }
+        :root {{
+            {root_vars}
+        }}
 
-        html, body, .stApp {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-        }
+        {system_dark_override}
 
-        * {
-            box-sizing: border-box;
-        }
+        /* Main app background and text */
+        html,
+        body,
+        .stApp,
+        [data-testid="stAppViewContainer"],
+        [data-testid="stHeader"] {{
+            background-color: var(--safehome-bg) !important;
+            color: var(--safehome-text) !important;
+        }}
 
-        .block-container {
-            max-width: 560px !important;
-            padding-top: 1rem !important;
-            padding-left: 1rem !important;
-            padding-right: 1rem !important;
-            padding-bottom: 2rem !important;
-            color: #111827 !important;
-        }
+        html,
+        body,
+        .stApp {{
+            font-size: {base_font_size}px !important;
+        }}
 
+        .block-container {{
+            max-width: 560px;
+            padding-top: 1rem;
+            padding-left: 1rem;
+            padding-right: 1rem;
+            padding-bottom: 2rem;
+            color: var(--safehome-text) !important;
+        }}
+
+        /* Global readable text */
         h1, h2, h3, h4, h5, h6,
-        p, li, span, div, label {
-            color: #111827 !important;
-        }
+        p, li, span, div,
+        .stMarkdown,
+        .stMarkdown p,
+        .stMarkdown li {{
+            color: var(--safehome-text) !important;
+        }}
 
-        h1 {
+        h1 {{
             font-size: 2rem !important;
             line-height: 1.15 !important;
             margin-bottom: 0.5rem !important;
-        }
+        }}
 
-        h2, h3 {
+        h2, h3 {{
             line-height: 1.25 !important;
-        }
+        }}
 
-        p, li {
+        p, li {{
             line-height: 1.45 !important;
-        }
+        }}
 
-        /* Main app cards */
-        .big-tagline {
-            font-size: 1.35rem !important;
+        /* Accessibility panel label */
+        .accessibility-label {{
+            font-size: 1.05rem !important;
             font-weight: 800 !important;
-            line-height: 1.35 !important;
-            margin-bottom: 1rem !important;
-            color: #111827 !important;
-        }
+            color: var(--safehome-text) !important;
+            margin-top: 1rem;
+            margin-bottom: 0.35rem;
+        }}
 
+        /* Cards */
         .plain-card,
         .step-card,
-        .hazard-card,
         .checklist-card,
-        .print-report,
-        .print-step-card {
-            border: 1px solid #d1d5db !important;
-            background-color: #ffffff !important;
-            color: #111827 !important;
+        .print-step-card {{
+            border: 1px solid var(--safehome-border) !important;
+            border-radius: 16px !important;
+            padding: 1rem !important;
+            margin-top: 1rem !important;
+            margin-bottom: 1rem !important;
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            line-height: 1.45 !important;
+        }}
+
+        .hazard-card,
+        .print-report {{
+            border: 1px solid var(--safehome-border) !important;
             border-radius: 16px !important;
             padding: 1rem !important;
             margin-top: 0.9rem !important;
             margin-bottom: 0.9rem !important;
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
             line-height: 1.45 !important;
-        }
+            overflow-wrap: break-word !important;
+            word-wrap: break-word !important;
+        }}
 
-        .plain-card,
-        .step-card,
-        .print-step-card {
-            background-color: #f9fafb !important;
-        }
+        .print-report {{
+            white-space: pre-wrap !important;
+            font-family: Arial, sans-serif !important;
+            font-size: 0.95rem !important;
+        }}
 
-        .hazard-card {
-            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08) !important;
-        }
+        .big-tagline {{
+            font-size: 1.35rem !important;
+            font-weight: 800 !important;
+            line-height: 1.35 !important;
+            margin-bottom: 1rem !important;
+            color: var(--safehome-text) !important;
+        }}
 
-        .hazard-number {
+        .small-muted {{
+            font-size: 0.95rem !important;
+            color: var(--safehome-muted) !important;
+            line-height: 1.4 !important;
+        }}
+
+        /* Hazard card details */
+        .hazard-number {{
             font-size: 0.9rem !important;
             font-weight: 700 !important;
-            color: #374151 !important;
+            color: var(--safehome-muted) !important;
             margin-bottom: 0.3rem !important;
-        }
+        }}
 
-        .hazard-title {
+        .hazard-title {{
             font-size: 1.15rem !important;
             font-weight: 800 !important;
             margin-bottom: 0.4rem !important;
-            color: #111827 !important;
-        }
+            color: var(--safehome-text) !important;
+        }}
 
-        .hazard-category {
+        .hazard-category {{
             display: inline-block !important;
             border-radius: 999px !important;
             padding: 0.25rem 0.65rem !important;
             margin-bottom: 0.75rem !important;
-            background-color: #e5e7eb !important;
-            color: #111827 !important;
+            background-color: var(--safehome-pill-bg) !important;
+            color: var(--safehome-text) !important;
             font-size: 0.85rem !important;
             font-weight: 700 !important;
-        }
+            border: 1px solid var(--safehome-border) !important;
+        }}
 
-        .hazard-section-label {
+        .hazard-section-label {{
             font-weight: 800 !important;
             margin-top: 0.6rem !important;
             margin-bottom: 0.15rem !important;
-            color: #111827 !important;
-        }
+            color: var(--safehome-text) !important;
+        }}
 
-        .hazard-text {
+        .hazard-text {{
             margin-top: 0 !important;
             margin-bottom: 0.5rem !important;
             line-height: 1.45 !important;
-            color: #111827 !important;
-        }
+            color: var(--safehome-text) !important;
+        }}
 
-        .small-muted {
-            font-size: 0.95rem !important;
-            color: #4b5563 !important;
-            line-height: 1.4 !important;
-        }
-
-        /* Buttons */
-        div[data-testid="stButton"] > button,
+        /* Buttons: readable in every theme */
         .stButton > button,
-        button {
+        .stDownloadButton > button {{
             width: 100% !important;
-            min-height: 54px !important;
-            font-size: 18px !important;
-            font-weight: 700 !important;
+            min-height: 58px !important;
+            font-size: {base_font_size + 1}px !important;
+            font-weight: 800 !important;
             border-radius: 14px !important;
             margin-top: 0.25rem !important;
             margin-bottom: 0.25rem !important;
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-            border: 1px solid #9ca3af !important;
-        }
+            background-color: var(--safehome-button-bg) !important;
+            color: var(--safehome-button-text) !important;
+            border: 2px solid var(--safehome-border) !important;
+        }}
 
-        div[data-testid="stButton"] > button:hover,
+        .stButton > button *,
+        .stDownloadButton > button * {{
+            color: var(--safehome-button-text) !important;
+        }}
+
         .stButton > button:hover,
-        button:hover {
-            background-color: #e5e7eb !important;
-            color: #111827 !important;
-            border: 1px solid #6b7280 !important;
-        }
+        .stDownloadButton > button:hover {{
+            filter: brightness(1.08) !important;
+            border: 2px solid var(--safehome-primary-bg) !important;
+        }}
 
-        div[data-testid="stButton"] > button[kind="primary"],
-        .stButton > button[kind="primary"] {
-            background-color: #2563eb !important;
-            color: #ffffff !important;
-            border: 1px solid #2563eb !important;
-        }
+        .stButton > button[kind="primary"],
+        .stDownloadButton > button[kind="primary"] {{
+            background-color: var(--safehome-primary-bg) !important;
+            color: var(--safehome-primary-text) !important;
+            border: 2px solid var(--safehome-primary-bg) !important;
+        }}
 
-        div[data-testid="stButton"] > button[kind="primary"]:hover,
-        .stButton > button[kind="primary"]:hover {
-            background-color: #1d4ed8 !important;
-            color: #ffffff !important;
-            border: 1px solid #1d4ed8 !important;
-        }
+        .stButton > button[kind="primary"] *,
+        .stDownloadButton > button[kind="primary"] * {{
+            color: var(--safehome-primary-text) !important;
+        }}
 
-        /* Download button */
-        div[data-testid="stDownloadButton"] > button,
-        .stDownloadButton > button {
-            width: 100% !important;
-            min-height: 54px !important;
-            font-size: 18px !important;
-            font-weight: 700 !important;
-            border-radius: 14px !important;
-            background-color: #2563eb !important;
-            color: #ffffff !important;
-            border: 1px solid #2563eb !important;
-        }
+        /* Radio buttons and widget labels */
+        div[data-testid="stWidgetLabel"],
+        div[data-testid="stWidgetLabel"] *,
+        div[data-testid="stRadio"],
+        div[data-testid="stRadio"] *,
+        div[data-baseweb="radio"],
+        div[data-baseweb="radio"] *,
+        label,
+        label * {{
+            color: var(--safehome-text) !important;
+        }}
 
-        div[data-testid="stDownloadButton"] > button:hover,
-        .stDownloadButton > button:hover {
-            background-color: #1d4ed8 !important;
-            color: #ffffff !important;
-        }
-
-        /* Radio buttons and labels */
-        div[role="radiogroup"] label {
-            border: 1px solid #d1d5db !important;
+        div[data-testid="stRadio"] label {{
+            border: 1px solid var(--safehome-border) !important;
             border-radius: 12px !important;
-            padding: 0.85rem !important;
-            margin-bottom: 0.45rem !important;
-            background-color: #f9fafb !important;
-            color: #111827 !important;
-            min-height: 44px !important;
-        }
+            padding: 0.9rem !important;
+            margin-bottom: 0.5rem !important;
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+            min-height: 48px !important;
+        }}
 
-        div[role="radiogroup"] label:hover {
-            background-color: #e5e7eb !important;
-            color: #111827 !important;
-        }
-
-        div[role="radiogroup"] label * {
-            color: #111827 !important;
-        }
-
-        div[role="radiogroup"] label p {
-            color: #111827 !important;
-        }
+        div[data-testid="stRadio"] label p {{
+            color: var(--safehome-text) !important;
+            font-size: {base_font_size}px !important;
+            font-weight: 600 !important;
+        }}
 
         /* File uploader */
-        div[data-testid="stFileUploader"] {
-            border: 1px dashed #9ca3af !important;
+        div[data-testid="stFileUploader"] {{
+            border: 1px dashed var(--safehome-border) !important;
             border-radius: 16px !important;
             padding: 0.75rem !important;
-            background-color: #f9fafb !important;
-            color: #111827 !important;
-        }
+            background-color: var(--safehome-card) !important;
+            color: var(--safehome-text) !important;
+        }}
 
-        div[data-testid="stFileUploader"] * {
-            color: #111827 !important;
-        }
+        div[data-testid="stFileUploader"] * {{
+            color: var(--safehome-text) !important;
+        }}
 
-        div[data-testid="stFileUploader"] button {
-            background-color: #f3f4f6 !important;
-            color: #111827 !important;
-            border: 1px solid #9ca3af !important;
-        }
-
-        div[data-testid="stFileUploader"] button:hover {
-            background-color: #e5e7eb !important;
-            color: #111827 !important;
-        }
-
-        /* Alerts */
-        div[data-testid="stAlert"] {
-            color: #111827 !important;
-        }
-
-        div[data-testid="stAlert"] * {
-            color: #111827 !important;
-        }
-
-        /* Metrics */
-        div[data-testid="stMetric"] {
-            color: #111827 !important;
-        }
-
-        div[data-testid="stMetric"] * {
-            color: #111827 !important;
-        }
-
-        /* Expanders */
-        details {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border-radius: 12px !important;
-        }
-
-        details summary {
-            color: #111827 !important;
-        }
-
-        details * {
-            color: #111827 !important;
-        }
-
-        /* Text inputs / report boxes */
+        /* Text areas and inputs */
         textarea,
-        input {
-            background-color: #ffffff !important;
-            color: #111827 !important;
-            border: 1px solid #d1d5db !important;
-            font-size: 16px !important;
-        }
+        input {{
+            font-size: {base_font_size}px !important;
+            color: var(--safehome-text) !important;
+            background-color: var(--safehome-card-2) !important;
+            border-color: var(--safehome-border) !important;
+        }}
 
-        .print-report {
-            white-space: pre-wrap !important;
-            font-family: Arial, sans-serif !important;
-            font-size: 0.95rem !important;
-            overflow-wrap: break-word !important;
-            word-wrap: break-word !important;
-        }
+        /* Alerts, metrics, expanders */
+        div[data-testid="stAlert"],
+        div[data-testid="stAlert"] *,
+        div[data-testid="stMetric"],
+        div[data-testid="stMetric"] *,
+        .stCaptionContainer,
+        .stCaptionContainer * {{
+            color: var(--safehome-text) !important;
+        }}
 
-        img {
+        details {{
+            color: var(--safehome-text) !important;
+            background-color: var(--safehome-card-2) !important;
             border-radius: 12px !important;
-        }
+        }}
 
-        /* Mobile layout */
-        @media screen and (max-width: 480px) {
-            .block-container {
+        details summary {{
+            color: var(--safehome-text) !important;
+            font-weight: 700 !important;
+        }}
+
+        img {{
+            border-radius: 12px !important;
+        }}
+
+        /* Mobile */
+        @media screen and (max-width: 480px) {{
+            .block-container {{
                 padding-left: 0.85rem !important;
                 padding-right: 0.85rem !important;
                 padding-top: 0.75rem !important;
-            }
+            }}
 
-            h1 {
+            h1 {{
                 font-size: 1.8rem !important;
-            }
+            }}
 
-            .big-tagline {
+            .big-tagline {{
                 font-size: 1.2rem !important;
-            }
+            }}
 
             .plain-card,
             .hazard-card,
             .checklist-card,
             .print-step-card,
             .print-report,
-            .step-card {
+            .step-card {{
                 padding: 0.9rem !important;
                 border-radius: 14px !important;
-            }
+            }}
 
-            div[data-testid="stButton"] > button,
             .stButton > button,
-            div[data-testid="stDownloadButton"] > button,
-            .stDownloadButton > button {
-                min-height: 56px !important;
-                font-size: 17px !important;
-            }
-        }
+            .stDownloadButton > button {{
+                min-height: 60px !important;
+                font-size: {base_font_size + 1}px !important;
+            }}
+        }}
 
-        /* Print layout */
-        @media print {
-            header, footer, [data-testid="stToolbar"], [data-testid="stSidebar"] {
+        /* Print */
+        @media print {{
+            header,
+            footer,
+            [data-testid="stToolbar"],
+            [data-testid="stSidebar"],
+            .stButton,
+            .stDownloadButton {{
                 display: none !important;
-            }
+            }}
 
-            .stButton, .stDownloadButton {
-                display: none !important;
-            }
-
-            .block-container {
+            .block-container {{
                 max-width: 100% !important;
                 padding: 1rem !important;
-            }
+            }}
 
-            .print-report {
+            .print-report {{
                 border: none !important;
                 font-size: 12pt !important;
                 color: #000000 !important;
                 background-color: #ffffff !important;
-            }
-        }
+            }}
+        }}
         </style>
         """,
         unsafe_allow_html=True,
     )
-
+    
 def go_to_page(page_name):
     st.session_state["page"] = page_name
     st.rerun()
