@@ -407,6 +407,45 @@ def add_mobile_friendly_style():
             color: var(--safehome-text);
             font-weight: 700;
         }}
+        .accessibility-label {
+            font-size: 1.05rem;
+            font-weight: 800;
+            color: var(--safehome-text);
+            margin-top: 1rem;
+            margin-bottom: 0.35rem;
+        }
+
+        /* Force Streamlit widget labels and radio text to follow accessibility settings */
+        div[data-testid="stWidgetLabel"],
+        div[data-testid="stWidgetLabel"] *,
+        div[data-testid="stRadio"],
+        div[data-testid="stRadio"] *,
+        div[data-baseweb="radio"],
+        div[data-baseweb="radio"] *,
+        label,
+        label *,
+        .stCaptionContainer,
+        .stCaptionContainer * {
+            color: var(--safehome-text) !important;
+            font-size: inherit !important;
+        }
+
+        /* Make radio options easier to read and tap */
+        div[data-testid="stRadio"] label {
+            background-color: var(--safehome-card-bg) !important;
+            color: var(--safehome-text) !important;
+            border: 1px solid var(--safehome-border) !important;
+            border-radius: 12px !important;
+            padding: 0.85rem !important;
+            margin-bottom: 0.45rem !important;
+        }
+
+        /* Radio option text */
+        div[data-testid="stRadio"] label p {
+            color: var(--safehome-text) !important;
+            font-size: 1rem !important;
+            font-weight: 600 !important;
+        }
 
         @media screen and (max-width: 480px) {{
             .block-container {{
@@ -486,32 +525,41 @@ def show_accessibility_panel():
             st.rerun()
 
     if st.session_state["show_accessibility_panel"]:
-        with st.container():
-            st.markdown(
-                """
-                <div class="plain-card">
-                    <strong>Accessibility Settings</strong><br>
-                    Adjust text size and color scheme.
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            """
+            <div class="plain-card">
+                <strong>Accessibility Settings</strong><br>
+                Adjust text size and color scheme.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-            st.radio(
-                "Text size",
-                list(TEXT_SIZE_OPTIONS.keys()),
-                key="text_size",
-            )
+        st.markdown(
+            "<div class='accessibility-label'>Text size</div>",
+            unsafe_allow_html=True,
+        )
 
-            st.radio(
-                "Color scheme",
-                COLOR_SCHEME_OPTIONS,
-                key="color_scheme",
-            )
+        st.radio(
+            "Text size",
+            list(TEXT_SIZE_OPTIONS.keys()),
+            key="text_size",
+            label_visibility="collapsed",
+        )
 
-            st.caption(
-                "System follows your device’s light or dark mode setting."
-            )
+        st.markdown(
+            "<div class='accessibility-label'>Color scheme</div>",
+            unsafe_allow_html=True,
+        )
+
+        st.radio(
+            "Color scheme",
+            COLOR_SCHEME_OPTIONS,
+            key="color_scheme",
+            label_visibility="collapsed",
+        )
+
+        st.caption("System follows your device’s light or dark mode setting.")
 
 def show_step_card(step_text):
     """
