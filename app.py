@@ -1,5 +1,5 @@
 import streamlit as st
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
 from src.scoring import calculate_score, get_risk_level, get_score_breakdown
 from src.ai_analysis import analyze_photo
 from src.report import generate_report
@@ -138,6 +138,7 @@ def add_mobile_friendly_style():
         --safehome-border: #d1d5db;
         --safehome-pill-bg: #e5e7eb;
         --safehome-primary: #2563eb;
+        --safehome-primary-text: #ffffff;
         """
         system_dark_css = ""
 
@@ -151,6 +152,7 @@ def add_mobile_friendly_style():
         --safehome-border: #6b7280;
         --safehome-pill-bg: #4b5563;
         --safehome-primary: #60a5fa;
+        --safehome-primary-text: #111827;
         """
         system_dark_css = ""
 
@@ -164,6 +166,7 @@ def add_mobile_friendly_style():
         --safehome-border: #ffffff;
         --safehome-pill-bg: #ffffff;
         --safehome-primary: #ffff00;
+        --safehome-primary-text: #000000;
         """
         system_dark_css = ""
 
@@ -178,6 +181,7 @@ def add_mobile_friendly_style():
         --safehome-border: #d1d5db;
         --safehome-pill-bg: #e5e7eb;
         --safehome-primary: #2563eb;
+        --safehome-primary-text: #ffffff;
         """
         system_dark_css = """
         @media (prefers-color-scheme: dark) {
@@ -190,6 +194,7 @@ def add_mobile_friendly_style():
                 --safehome-border: #6b7280;
                 --safehome-pill-bg: #4b5563;
                 --safehome-primary: #60a5fa;
+                --safehome-primary-text: #111827;
             }
         }
         """
@@ -558,6 +563,21 @@ def validate_uploaded_photo(uploaded_file):
 
     return True, ""
 
+def open_uploaded_image_correct_orientation(uploaded_file):
+    """
+    Opens an uploaded image and fixes phone photo orientation.
+
+    Some iPhone/phone photos are stored sideways with EXIF orientation data.
+    ImageOps.exif_transpose() rotates the image so portrait photos stay portrait
+    and landscape photos stay landscape.
+    """
+
+    uploaded_file.seek(0)
+    image = Image.open(uploaded_file)
+    image = ImageOps.exif_transpose(image)
+    uploaded_file.seek(0)
+
+    return image
 
 def get_category_label(category):
     return CATEGORY_LABELS.get(category, "Possible Hazard")
@@ -752,7 +772,7 @@ def show_photo_upload_page():
 
         st.subheader("Photo Preview")
 
-        image = Image.open(uploaded_file)
+        image = open_uploaded_image_correct_orientation(uploaded_file)
         st.image(
             image,
             caption=f"Preview of uploaded {room_type} photo",
