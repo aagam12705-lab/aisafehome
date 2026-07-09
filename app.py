@@ -35,38 +35,12 @@ TEXT_SIZE_OPTIONS = {
     "Extra Large": 23,
 }
 
-COLOR_SCHEMES = {
-    "Light": {
-        "app_bg": "#ffffff",
-        "card_bg": "#f9fafb",
-        "card_bg_alt": "#ffffff",
-        "text": "#111827",
-        "muted": "#4b5563",
-        "border": "#d1d5db",
-        "pill_bg": "#e5e7eb",
-        "primary": "#2563eb",
-    },
-    "Dark": {
-        "app_bg": "#111827",
-        "card_bg": "#1f2937",
-        "card_bg_alt": "#374151",
-        "text": "#f9fafb",
-        "muted": "#d1d5db",
-        "border": "#6b7280",
-        "pill_bg": "#4b5563",
-        "primary": "#60a5fa",
-    },
-    "High Contrast": {
-        "app_bg": "#000000",
-        "card_bg": "#000000",
-        "card_bg_alt": "#111111",
-        "text": "#ffffff",
-        "muted": "#ffffff",
-        "border": "#ffffff",
-        "pill_bg": "#ffffff",
-        "primary": "#ffff00",
-    },
-}
+COLOR_SCHEME_OPTIONS = [
+    "System",
+    "Light",
+    "Dark",
+    "High Contrast",
+]
 
 CATEGORY_LABELS = {
     "loose_rug": "Loose Rug or Mat",
@@ -135,8 +109,10 @@ def initialize_session_state():
         st.session_state["text_size"] = "Normal"
 
     if "color_scheme" not in st.session_state:
-        st.session_state["color_scheme"] = "Light"      
+        st.session_state["color_scheme"] = "System"
 
+    if "show_accessibility_panel" not in st.session_state:
+        st.session_state["show_accessibility_panel"] = False   
 
 def add_mobile_friendly_style():
     """
@@ -144,27 +120,98 @@ def add_mobile_friendly_style():
     - iPhone-friendly layout
     - large tap targets
     - accessibility text size
-    - light, dark, and high-contrast color schemes
+    - system/light/dark/high-contrast color schemes
     """
 
     text_size_name = st.session_state.get("text_size", "Normal")
-    color_scheme_name = st.session_state.get("color_scheme", "Light")
+    color_scheme_name = st.session_state.get("color_scheme", "System")
 
     base_font_size = TEXT_SIZE_OPTIONS.get(text_size_name, 17)
-    colors = COLOR_SCHEMES.get(color_scheme_name, COLOR_SCHEMES["Light"])
+
+    if color_scheme_name == "Light":
+        theme_variables = """
+        --safehome-app-bg: #ffffff;
+        --safehome-card-bg: #f9fafb;
+        --safehome-card-alt: #ffffff;
+        --safehome-text: #111827;
+        --safehome-muted: #4b5563;
+        --safehome-border: #d1d5db;
+        --safehome-pill-bg: #e5e7eb;
+        --safehome-primary: #2563eb;
+        """
+        system_dark_css = ""
+
+    elif color_scheme_name == "Dark":
+        theme_variables = """
+        --safehome-app-bg: #111827;
+        --safehome-card-bg: #1f2937;
+        --safehome-card-alt: #374151;
+        --safehome-text: #f9fafb;
+        --safehome-muted: #d1d5db;
+        --safehome-border: #6b7280;
+        --safehome-pill-bg: #4b5563;
+        --safehome-primary: #60a5fa;
+        """
+        system_dark_css = ""
+
+    elif color_scheme_name == "High Contrast":
+        theme_variables = """
+        --safehome-app-bg: #000000;
+        --safehome-card-bg: #000000;
+        --safehome-card-alt: #111111;
+        --safehome-text: #ffffff;
+        --safehome-muted: #ffffff;
+        --safehome-border: #ffffff;
+        --safehome-pill-bg: #ffffff;
+        --safehome-primary: #ffff00;
+        """
+        system_dark_css = ""
+
+    else:
+        # System default starts light, then switches to dark if device/browser prefers dark.
+        theme_variables = """
+        --safehome-app-bg: #ffffff;
+        --safehome-card-bg: #f9fafb;
+        --safehome-card-alt: #ffffff;
+        --safehome-text: #111827;
+        --safehome-muted: #4b5563;
+        --safehome-border: #d1d5db;
+        --safehome-pill-bg: #e5e7eb;
+        --safehome-primary: #2563eb;
+        """
+        system_dark_css = """
+        @media (prefers-color-scheme: dark) {
+            :root {
+                --safehome-app-bg: #111827;
+                --safehome-card-bg: #1f2937;
+                --safehome-card-alt: #374151;
+                --safehome-text: #f9fafb;
+                --safehome-muted: #d1d5db;
+                --safehome-border: #6b7280;
+                --safehome-pill-bg: #4b5563;
+                --safehome-primary: #60a5fa;
+            }
+        }
+        """
 
     st.markdown(
         f"""
         <style>
+        :root {{
+            {theme_variables}
+        }}
+
+        {system_dark_css}
+
         html, body, [class*="css"] {{
             font-size: {base_font_size}px;
-            color: {colors["text"]};
-            background-color: {colors["app_bg"]};
+            color: var(--safehome-text);
+            background-color: var(--safehome-app-bg);
         }}
 
         .stApp {{
-            background-color: {colors["app_bg"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-app-bg);
+            color: var(--safehome-text);
         }}
 
         .block-container {{
@@ -173,11 +220,11 @@ def add_mobile_friendly_style():
             padding-left: 1rem;
             padding-right: 1rem;
             padding-bottom: 2rem;
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
         h1, h2, h3, h4, h5, h6 {{
-            color: {colors["text"]} !important;
+            color: var(--safehome-text) !important;
         }}
 
         h1 {{
@@ -197,19 +244,10 @@ def add_mobile_friendly_style():
         .stMarkdown,
         .stMarkdown p,
         .stMarkdown li {{
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
-        .stButton > button {{
-            width: 100%;
-            min-height: 58px;
-            font-size: {base_font_size + 1}px;
-            font-weight: 800;
-            border-radius: 14px;
-            margin-top: 0.25rem;
-            margin-bottom: 0.25rem;
-        }}
-
+        .stButton > button,
         .stDownloadButton > button {{
             width: 100%;
             min-height: 58px;
@@ -225,47 +263,38 @@ def add_mobile_friendly_style():
             font-weight: 800;
             line-height: 1.35;
             margin-bottom: 1rem;
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
-        .plain-card {{
-            border: 1px solid {colors["border"]};
+        .plain-card,
+        .step-card,
+        .checklist-card,
+        .print-step-card {{
+            border: 1px solid var(--safehome-border);
             border-radius: 16px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: {colors["card_bg"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-card-bg);
+            color: var(--safehome-text);
             line-height: 1.45;
         }}
 
-        .step-card {{
-            border: 1px solid {colors["border"]};
-            border-radius: 16px;
-            padding: 0.85rem 1rem;
-            margin-top: 0.5rem;
-            margin-bottom: 1rem;
-            background-color: {colors["card_bg"]};
-            color: {colors["text"]};
-            font-size: 0.95rem;
-            line-height: 1.4;
-        }}
-
         .hazard-card {{
-            border: 1px solid {colors["border"]};
+            border: 1px solid var(--safehome-border);
             border-radius: 16px;
             padding: 1rem;
             margin-top: 0.9rem;
             margin-bottom: 0.9rem;
-            background-color: {colors["card_bg_alt"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-card-alt);
+            color: var(--safehome-text);
             box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
         }}
 
         .hazard-number {{
             font-size: 0.9rem;
             font-weight: 700;
-            color: {colors["muted"]};
+            color: var(--safehome-muted);
             margin-bottom: 0.3rem;
         }}
 
@@ -273,7 +302,7 @@ def add_mobile_friendly_style():
             font-size: 1.15rem;
             font-weight: 800;
             margin-bottom: 0.4rem;
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
         .hazard-category {{
@@ -281,79 +310,68 @@ def add_mobile_friendly_style():
             border-radius: 999px;
             padding: 0.25rem 0.65rem;
             margin-bottom: 0.75rem;
-            background-color: {colors["pill_bg"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-pill-bg);
+            color: var(--safehome-text);
             font-size: 0.85rem;
             font-weight: 700;
-            border: 1px solid {colors["border"]};
+            border: 1px solid var(--safehome-border);
         }}
 
         .hazard-section-label {{
             font-weight: 800;
             margin-top: 0.6rem;
             margin-bottom: 0.15rem;
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
         .hazard-text {{
             margin-top: 0;
             margin-bottom: 0.5rem;
             line-height: 1.45;
-            color: {colors["text"]};
-        }}
-
-        .checklist-card {{
-            border: 1px solid {colors["border"]};
-            border-radius: 14px;
-            padding: 1rem;
-            margin-top: 1rem;
-            margin-bottom: 0.5rem;
-            background-color: {colors["card_bg_alt"]};
-            color: {colors["text"]};
-            line-height: 1.45;
+            color: var(--safehome-text);
         }}
 
         div[role="radiogroup"] label {{
-            border: 1px solid {colors["border"]};
+            border: 1px solid var(--safehome-border);
             border-radius: 12px;
             padding: 0.9rem;
             margin-bottom: 0.5rem;
-            background-color: {colors["card_bg"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-card-bg);
+            color: var(--safehome-text);
             min-height: 48px;
         }}
 
         div[role="radiogroup"] label p {{
-            color: {colors["text"]} !important;
+            color: var(--safehome-text) !important;
             font-size: {base_font_size}px;
         }}
 
         div[data-testid="stFileUploader"] {{
-            border: 1px dashed {colors["border"]};
+            border: 1px dashed var(--safehome-border);
             border-radius: 16px;
             padding: 0.75rem;
-            background-color: {colors["card_bg"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-card-bg);
+            color: var(--safehome-text);
         }}
 
         div[data-testid="stFileUploader"] * {{
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
         .small-muted {{
             font-size: 0.95rem;
-            color: {colors["muted"]};
+            color: var(--safehome-muted);
             line-height: 1.4;
         }}
 
         .print-report {{
-            border: 1px solid {colors["border"]};
+            border: 1px solid var(--safehome-border);
             border-radius: 14px;
             padding: 1rem;
             margin-top: 1rem;
             margin-bottom: 1rem;
-            background-color: {colors["card_bg_alt"]};
-            color: {colors["text"]};
+            background-color: var(--safehome-card-alt);
+            color: var(--safehome-text);
             white-space: pre-wrap;
             line-height: 1.45;
             font-family: Arial, sans-serif;
@@ -362,56 +380,31 @@ def add_mobile_friendly_style():
             word-wrap: break-word;
         }}
 
-        .print-step-card {{
-            border: 1px solid {colors["border"]};
-            border-radius: 14px;
-            padding: 1rem;
-            margin-top: 0.75rem;
-            margin-bottom: 0.75rem;
-            background-color: {colors["card_bg"]};
-            color: {colors["text"]};
-            line-height: 1.45;
-        }}
-
-        textarea {{
+        textarea, input {{
             font-size: {base_font_size}px !important;
-            color: {colors["text"]} !important;
-            background-color: {colors["card_bg_alt"]} !important;
-        }}
-
-        input {{
-            color: {colors["text"]} !important;
-            background-color: {colors["card_bg_alt"]} !important;
+            color: var(--safehome-text) !important;
+            background-color: var(--safehome-card-alt) !important;
         }}
 
         img {{
             border-radius: 12px;
         }}
 
-        div[data-testid="stAlert"] {{
-            color: {colors["text"]};
-        }}
-
-        div[data-testid="stAlert"] * {{
-            color: {colors["text"]};
-        }}
-
-        div[data-testid="stMetric"] {{
-            color: {colors["text"]};
-        }}
-
+        div[data-testid="stAlert"],
+        div[data-testid="stAlert"] *,
+        div[data-testid="stMetric"],
         div[data-testid="stMetric"] * {{
-            color: {colors["text"]};
+            color: var(--safehome-text);
         }}
 
         details {{
-            color: {colors["text"]};
-            background-color: {colors["card_bg_alt"]};
+            color: var(--safehome-text);
+            background-color: var(--safehome-card-alt);
             border-radius: 12px;
         }}
 
         details summary {{
-            color: {colors["text"]};
+            color: var(--safehome-text);
             font-weight: 700;
         }}
 
@@ -479,28 +472,46 @@ def go_to_page(page_name):
 
 def show_accessibility_panel():
     """
-    Lets users change text size and color scheme.
-    This is especially useful for older adults or users with low vision.
+    Shows a small accessibility icon button.
+    Clicking it opens or closes the accessibility settings panel.
     """
 
-    with st.expander("♿ Accessibility Settings", expanded=False):
-        st.radio(
-            "Text size",
-            list(TEXT_SIZE_OPTIONS.keys()),
-            key="text_size",
-            horizontal=False,
-        )
+    left_col, right_col = st.columns([5, 1])
 
-        st.radio(
-            "Color scheme",
-            list(COLOR_SCHEMES.keys()),
-            key="color_scheme",
-            horizontal=False,
-        )
+    with right_col:
+        if st.button("♿", help="Accessibility settings"):
+            st.session_state["show_accessibility_panel"] = not st.session_state[
+                "show_accessibility_panel"
+            ]
+            st.rerun()
 
-        st.caption(
-            "These settings only change how the app looks. They do not affect the safety score."
-        )
+    if st.session_state["show_accessibility_panel"]:
+        with st.container():
+            st.markdown(
+                """
+                <div class="plain-card">
+                    <strong>Accessibility Settings</strong><br>
+                    Adjust text size and color scheme.
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
+
+            st.radio(
+                "Text size",
+                list(TEXT_SIZE_OPTIONS.keys()),
+                key="text_size",
+            )
+
+            st.radio(
+                "Color scheme",
+                COLOR_SCHEME_OPTIONS,
+                key="color_scheme",
+            )
+
+            st.caption(
+                "System follows your device’s light or dark mode setting."
+            )
 
 def show_step_card(step_text):
     """
