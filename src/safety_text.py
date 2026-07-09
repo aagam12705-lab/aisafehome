@@ -36,3 +36,13 @@ PHOTO_NOT_STORED_NOTE = (
     "Version 1 does not use a login, database, or stored photos. "
     "Use staged, non-patient photos for testing."
 )
+AI_USE_DISCLOSURE = (
+    "AI SafeHome uses AI to help identify possible visible home fall hazards "
+    "from room photos. AI may make mistakes, so users should review the room "
+    "themselves and ask a qualified professional for serious safety concerns."
+)
+
+FINAL_PRIVACY_SUMMARY = (
+    "AI SafeHome does not collect names, addresses, ages, medical history, "
+    "medications, or real patient photos. Version 1 does not use a login or database."
+)

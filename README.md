@@ -61,3 +61,31 @@ Main file:
 
 ```text
 app.py
+
+## Final Demo Materials
+
+This project includes:
+
+- `TESTING.md` — testing checklist
+- `DEMO_SCRIPT.md` — 2–3 minute demo video script
+- `SUBMISSION_NOTES.md` — app explanation and judging alignment
+- `FINAL_CHECKLIST.md` — final readiness checklist
+- `sample_photos/README.md` — staged photo rules
+
+## AI Use Disclosure
+
+AI SafeHome uses AI to help identify possible visible environmental fall hazards from room photos.
+
+AI may make mistakes. Users should review the room themselves and ask a qualified professional for serious safety concerns.
+
+AI coding tools were also used for brainstorming, debugging, and improving the project. The student reviewed, modified, tested, and can explain the code.
+
+## Final Safety Statement
+
+AI SafeHome is an educational home-safety tool.
+
+It does not diagnose medical conditions, predict individual medical fall risk, or guarantee fall prevention.
+
+It does not replace a doctor, therapist, or home-safety professional.
+
+Use staged, non-patient photos only.
