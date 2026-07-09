@@ -603,6 +603,23 @@ def show_step_card(step_text):
         unsafe_allow_html=True,
     )
 
+def show_final_footer():
+    """
+    Shows final AI, privacy, and safety reminders at the bottom of the app.
+    This helps make the project ready for judging and public demo.
+    """
+
+    st.divider()
+
+    with st.expander("AI, privacy, and safety disclosure"):
+        st.write(AI_USE_DISCLOSURE)
+        st.write(FINAL_PRIVACY_SUMMARY)
+        st.write(
+            "This app is an educational home-safety tool. It does not diagnose "
+            "medical conditions, predict individual medical fall risk, or guarantee "
+            "fall prevention."
+        )
+
 def validate_uploaded_photo(uploaded_file):
     if uploaded_file is None:
         return False, "No photo was uploaded."
@@ -1333,6 +1350,7 @@ def main():
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"
         st.rerun()
+    show_final_footer()    
 
 
 main()
