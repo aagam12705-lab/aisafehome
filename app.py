@@ -407,45 +407,7 @@ def add_mobile_friendly_style():
             color: var(--safehome-text);
             font-weight: 700;
         }}
-        .accessibility-label {
-            font-size: 1.05rem;
-            font-weight: 800;
-            color: var(--safehome-text);
-            margin-top: 1rem;
-            margin-bottom: 0.35rem;
-        }
-
-        /* Force Streamlit widget labels and radio text to follow accessibility settings */
-        div[data-testid="stWidgetLabel"],
-        div[data-testid="stWidgetLabel"] *,
-        div[data-testid="stRadio"],
-        div[data-testid="stRadio"] *,
-        div[data-baseweb="radio"],
-        div[data-baseweb="radio"] *,
-        label,
-        label *,
-        .stCaptionContainer,
-        .stCaptionContainer * {
-            color: var(--safehome-text) !important;
-            font-size: inherit !important;
-        }
-
-        /* Make radio options easier to read and tap */
-        div[data-testid="stRadio"] label {
-            background-color: var(--safehome-card-bg) !important;
-            color: var(--safehome-text) !important;
-            border: 1px solid var(--safehome-border) !important;
-            border-radius: 12px !important;
-            padding: 0.85rem !important;
-            margin-bottom: 0.45rem !important;
-        }
-
-        /* Radio option text */
-        div[data-testid="stRadio"] label p {
-            color: var(--safehome-text) !important;
-            font-size: 1rem !important;
-            font-weight: 600 !important;
-        }
+        
 
         @media screen and (max-width: 480px) {{
             .block-container {{
