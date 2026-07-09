@@ -1,7 +1,7 @@
 import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
 from src.scoring import calculate_score, get_risk_level, get_score_breakdown
-from src.multi_room import build_home_summary, get_home_priority_label
+from src.multi-room import build_home_summary, get_home_priority_label
 from src.ai_analysis import analyze_photo
 from src.report import generate_report
 from src.checklist import CHECKLIST_QUESTIONS, ANSWER_OPTIONS, ANSWER_VALUE_MAP
