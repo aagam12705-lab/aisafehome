@@ -1,6 +1,7 @@
 import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
 from src.scoring import calculate_score, get_risk_level, get_score_breakdown
+from src.multi_room import build_home_summary, get_home_priority_label
 from src.ai_analysis import analyze_photo
 from src.report import generate_report
 from src.checklist import CHECKLIST_QUESTIONS, ANSWER_OPTIONS, ANSWER_VALUE_MAP
@@ -115,6 +116,15 @@ def initialize_session_state():
 
     if "show_accessibility_panel" not in st.session_state:
         st.session_state["show_accessibility_panel"] = False   
+
+    if "room_results" not in st.session_state:
+        st.session_state["room_results"] = []
+
+    if "home_summary_text" not in st.session_state:
+        st.session_state["home_summary_text"] = None
+
+    if "current_check_saved" not in st.session_state:
+        st.session_state["current_check_saved"] = False    
 
 
 def add_mobile_friendly_style():
@@ -828,6 +838,97 @@ def get_report_file_name(room_type):
     safe_room_name = room_type.lower().replace(" ", "_")
     return f"ai_safehome_{safe_room_name}_safety_report.txt"
 
+def reset_current_room_check():
+    """
+    Clears the current room check but keeps the multi-room summary.
+    """
+
+    st.session_state["room_type"] = None
+    st.session_state["photo_uploaded"] = False
+    st.session_state["ai_result"] = None
+    st.session_state["checklist_answers"] = []
+    st.session_state["score"] = None
+    st.session_state["risk_level"] = None
+    st.session_state["score_breakdown"] = None
+    st.session_state["report_text"] = None
+    st.session_state["current_check_saved"] = False
+
+
+def clear_home_summary():
+    """
+    Clears all saved room results.
+    """
+
+    st.session_state["room_results"] = []
+    st.session_state["home_summary_text"] = None
+    st.session_state["current_check_saved"] = False
+
+
+def get_current_room_result():
+    """
+    Builds a saved result dictionary for the current completed room.
+    """
+
+    ai_result = st.session_state.get("ai_result") or {}
+    ai_hazards = ai_result.get("hazards", [])
+    checklist_answers = st.session_state.get("checklist_answers", [])
+
+    recommended_fixes = get_recommended_first_fixes(
+        ai_hazards,
+        checklist_answers,
+    )
+
+    return {
+        "room_type": st.session_state.get("room_type", "Unknown Room"),
+        "score": st.session_state.get("score", 0),
+        "risk_level": st.session_state.get("risk_level", "Low Risk"),
+        "hazards": ai_hazards,
+        "checklist_answers": checklist_answers,
+        "recommended_fixes": recommended_fixes,
+    }
+
+
+def save_current_room_to_summary():
+    """
+    Saves the current completed room to the multi-room summary.
+
+    Returns True if saved.
+    Returns False if it was already saved.
+    """
+
+    if st.session_state.get("current_check_saved"):
+        return False
+
+    room_result = get_current_room_result()
+
+    st.session_state["room_results"].append(room_result)
+    st.session_state["current_check_saved"] = True
+
+    return True
+
+
+def show_room_results_count():
+    """
+    Shows how many rooms are saved so far.
+    """
+
+    saved_count = len(st.session_state.get("room_results", []))
+
+    if saved_count == 0:
+        st.info("No rooms have been saved to the home summary yet.")
+    elif saved_count == 1:
+        st.info("1 room has been saved to the home summary.")
+    else:
+        st.info(f"{saved_count} rooms have been saved to the home summary.")
+
+
+def get_home_summary_file_name():
+    """
+    Creates a simple download filename.
+    """
+
+    return "ai_safehome_multi_room_summary.txt"
+
 def show_landing_page():
     st.title("🏠 AI SafeHome")
 
@@ -1150,7 +1251,7 @@ def show_checklist_summary_page():
         st.session_state["score"] = score
         st.session_state["risk_level"] = risk_level
         st.session_state["score_breakdown"] = score_breakdown
-
+        st.session_state["current_check_saved"] = False
         go_to_page("risk_score")
 
     if st.button("Edit Checklist"):
@@ -1259,7 +1360,25 @@ def show_risk_score_page():
         "AI may miss hazards. Please review the room yourself and consider asking "
         "a qualified professional for serious safety concerns."
     )
+    st.subheader("Multi-Room Home Summary")
 
+    show_room_results_count()
+
+    if st.button("Save This Room to Home Summary"):
+        saved = save_current_room_to_summary()
+
+        if saved:
+            st.success("This room was saved to the home summary.")
+        else:
+            st.info("This room is already saved. Edit the checklist and recalculate if you want to save a new version.")
+
+    if st.button("Check Another Room"):
+        reset_current_room_check()
+        go_to_page("room_selection")
+
+    if st.session_state.get("room_results"):
+        if st.button("View Home Summary"):
+            go_to_page("home_summary")
     if st.button("Create Safety Report →", type="primary"):
         report_text = generate_report(
             room_type=st.session_state.get("room_type"),
@@ -1367,7 +1486,25 @@ def show_safety_report_page():
     st.info(
         "AI SafeHome does not save this report to a database. If you want to keep it, download, print, or save it yourself."
     )
+    st.subheader("Multi-Room Home Summary")
 
+    show_room_results_count()
+
+    if st.button("Save This Room to Home Summary"):
+        saved = save_current_room_to_summary()
+
+        if saved:
+            st.success("This room was saved to the home summary.")
+        else:
+            st.info("This room is already saved.")
+
+    if st.button("Check Another Room"):
+        reset_current_room_check()
+        go_to_page("room_selection")
+
+    if st.session_state.get("room_results"):
+        if st.button("View Home Summary"):
+            go_to_page("home_summary")
     st.caption(
         "Privacy reminder: use staged, non-patient photos only. Do not upload faces, names, addresses, mail, bills, medication bottles, or medical documents."
     )
@@ -1396,7 +1533,115 @@ def show_safety_report_page():
         st.session_state["score_breakdown"] = None
         st.session_state["report_text"] = None
         go_to_page("landing")
+def show_home_summary_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Multi-Room Home Summary")
 
+    room_results = st.session_state.get("room_results", [])
+
+    if not room_results:
+        st.error("No rooms have been saved yet.")
+
+        if st.button("Check a Room"):
+            go_to_page("room_selection")
+
+        return
+
+    priority_label = get_home_priority_label(room_results)
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Rooms saved:</strong> {len(room_results)}<br>
+            <strong>Home review priority:</strong> {priority_label}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.warning(
+        "This is an educational home-safety summary. It is not a medical diagnosis "
+        "and does not guarantee fall prevention."
+    )
+
+    st.subheader("Saved Rooms")
+
+    for index, room in enumerate(room_results, start=1):
+        st.markdown(
+            f"""
+            <div class="plain-card">
+                <strong>Room {index}: {room["room_type"]}</strong><br>
+                Score: {room["score"]}/100<br>
+                Risk Level: {room["risk_level"]}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        hazards = room.get("hazards", [])
+
+        if hazards:
+            st.write("Possible hazards:")
+            for hazard in hazards:
+                st.write(f"- {hazard.get('title', 'Possible hazard')}")
+        else:
+            st.write("Possible hazards: none listed.")
+
+        fixes = room.get("recommended_fixes", [])
+
+        if fixes:
+            st.write("Recommended fixes:")
+            for fix in fixes[:3]:
+                st.write(f"- {fix}")
+
+        st.divider()
+
+    home_summary_text = build_home_summary(
+        room_results=room_results,
+        safety_disclaimer=SAFETY_DISCLAIMER,
+    )
+
+    st.session_state["home_summary_text"] = home_summary_text
+
+    st.subheader("Printable Multi-Room Summary")
+
+    st.markdown(
+        f"""
+        <div class="print-report">
+        {home_summary_text}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.download_button(
+        label="Download Multi-Room Summary",
+        data=home_summary_text,
+        file_name=get_home_summary_file_name(),
+        mime="text/plain",
+        type="primary",
+    )
+
+    st.info(
+        "This summary is not stored in a database. Download or print it if you want to keep it."
+    )
+
+    if st.button("Check Another Room"):
+        reset_current_room_check()
+        go_to_page("room_selection")
+
+    if st.button("Back to Current Room Report"):
+        go_to_page("safety_report")
+
+    if st.button("Clear Home Summary"):
+        clear_home_summary()
+        st.success("Home summary cleared.")
+        go_to_page("room_selection")
+
+    if st.button("Start Over Completely"):
+        reset_current_room_check()
+        clear_home_summary()
+        go_to_page("landing")
 def main():
     setup_page()
     initialize_session_state()
@@ -1420,7 +1665,9 @@ def main():
     elif current_page == "risk_score":
         show_risk_score_page()    
     elif current_page == "safety_report":
-        show_safety_report_page()    
+        show_safety_report_page()   
+    elif current_page == "home_summary":
+        show_home_summary_page()     
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"
