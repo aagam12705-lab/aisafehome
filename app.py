@@ -424,17 +424,86 @@ def add_mobile_friendly_style():
         }}
 
         /* File uploader */
-        div[data-testid="stFileUploader"] {{
+        /* File uploader: fixes white-on-white in dark/high contrast modes */
+        div[data-testid="stFileUploader"] {
             border: 1px dashed var(--safehome-border) !important;
             border-radius: 16px !important;
             padding: 0.75rem !important;
             background-color: var(--safehome-card) !important;
             color: var(--safehome-text) !important;
-        }}
+        }
 
-        div[data-testid="stFileUploader"] * {{
+        /* Main upload drop area */
+        section[data-testid="stFileUploaderDropzone"] {
+            background-color: var(--safehome-card) !important;
             color: var(--safehome-text) !important;
-        }}
+            border: 2px dashed var(--safehome-border) !important;
+            border-radius: 16px !important;
+        }
+
+        /* Everything inside the uploader */
+        div[data-testid="stFileUploader"] *,
+        section[data-testid="stFileUploaderDropzone"] * {
+            color: var(--safehome-text) !important;
+        }
+
+        /* Upload / Browse files button inside uploader */
+        section[data-testid="stFileUploaderDropzone"] button {
+            background-color: var(--safehome-button-bg) !important;
+            color: var(--safehome-button-text) !important;
+            border: 2px solid var(--safehome-border) !important;
+            border-radius: 12px !important;
+            font-weight: 800 !important;
+        }
+
+        /* Text inside upload button */
+        section[data-testid="stFileUploaderDropzone"] button *,
+        section[data-testid="stFileUploaderDropzone"] button p,
+        section[data-testid="stFileUploaderDropzone"] button span {
+            color: var(--safehome-button-text) !important;
+        }
+
+        /* Upload button hover */
+        section[data-testid="stFileUploaderDropzone"] button:hover {
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
+            border-color: var(--safehome-primary-bg) !important;
+        }
+
+        /* Drag/drop instruction text */
+        div[data-testid="stFileUploaderDropzoneInstructions"],
+        div[data-testid="stFileUploaderDropzoneInstructions"] *,
+        div[data-testid="stFileUploaderDropzoneInstructions"] p,
+        div[data-testid="stFileUploaderDropzoneInstructions"] small {
+            color: var(--safehome-text) !important;
+        }
+
+        /* File type / size helper text */
+        div[data-testid="stFileUploader"] small,
+        div[data-testid="stFileUploader"] span,
+        div[data-testid="stFileUploader"] p {
+            color: var(--safehome-text) !important;
+        }
+
+        /* Uploaded file name area */
+        div[data-testid="stFileUploaderFile"] {
+            background-color: var(--safehome-card-2) !important;
+            color: var(--safehome-text) !important;
+            border: 1px solid var(--safehome-border) !important;
+            border-radius: 12px !important;
+        }
+
+        div[data-testid="stFileUploaderFile"] * {
+            color: var(--safehome-text) !important;
+        }
+
+        /* Icons inside uploader */
+        div[data-testid="stFileUploader"] svg,
+        section[data-testid="stFileUploaderDropzone"] svg {
+            color: var(--safehome-text) !important;
+            fill: var(--safehome-text) !important;
+            stroke: var(--safehome-text) !important;
+        }
 
         /* Text areas and inputs */
         textarea,
