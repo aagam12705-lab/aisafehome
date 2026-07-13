@@ -1098,7 +1098,7 @@ def show_room_results_count():
 
 def get_home_summary_file_name():
     """
-    Creates a simple download filename.
+    Creates a simple download file.
     """
 
     return "ai_safehome_multi_room_summary.txt"
@@ -1551,10 +1551,10 @@ def show_risk_score_page():
 
     st.metric("Risk Score", f"{score}/100")
     if st.session_state.get("checklist_was_skipped"):
-    st.info(
-        "Review completeness: AI-only review. "
-        "The checklist was skipped, so this score may miss hazards that are not visible in the photo."
-    )
+        st.info(
+            "Review completeness: AI-only review. "
+            "The checklist was skipped, so this score may miss hazards that are not visible in the photo."
+        )
     else:
         checklist_answers = st.session_state.get("checklist_answers", [])
         answered_count = len(checklist_answers)
