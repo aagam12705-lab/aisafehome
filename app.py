@@ -1551,10 +1551,21 @@ def show_risk_score_page():
 
     st.metric("Risk Score", f"{score}/100")
     if st.session_state.get("checklist_was_skipped"):
-        st.info(
-            "Checklist was skipped. This score is based only on AI photo hazards, "
-            "so human review is still strongly recommended."
-        )
+    st.info(
+        "Review completeness: AI-only review. "
+        "The checklist was skipped, so this score may miss hazards that are not visible in the photo."
+    )
+    else:
+        checklist_answers = st.session_state.get("checklist_answers", [])
+        answered_count = len(checklist_answers)
+
+        if answered_count < len(CHECKLIST_QUESTIONS):
+            st.info(
+                "Review completeness: Partial checklist review. "
+                "Some checklist questions were skipped or not answered."
+            )
+        else:
+            st.success("Review completeness: AI photo review + checklist review.")
     st.progress(score)
 
     if risk_level == "Low Risk":
