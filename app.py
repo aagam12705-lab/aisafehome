@@ -1058,6 +1058,7 @@ def get_current_room_result():
         "hazards": ai_hazards,
         "checklist_answers": checklist_answers,
         "recommended_fixes": recommended_fixes,
+        "checklist_was_skipped": st.session_state.get("checklist_was_skipped", False),
     }
 
 
@@ -1549,7 +1550,11 @@ def show_risk_score_page():
         return
 
     st.metric("Risk Score", f"{score}/100")
-
+    if st.session_state.get("checklist_was_skipped"):
+        st.info(
+            "Checklist was skipped. This score is based only on AI photo hazards, "
+            "so human review is still strongly recommended."
+        )
     st.progress(score)
 
     if risk_level == "Low Risk":
@@ -1609,7 +1614,11 @@ def show_risk_score_page():
     with st.expander("View score breakdown"):
         if score_breakdown:
             st.write(f"AI hazard points: **{score_breakdown['ai_points']}**")
-            st.write(f"Checklist points: **{score_breakdown['checklist_points']}**")
+            if st.session_state.get("checklist_was_skipped"):
+                st.write("Checklist status: **Skipped**")
+            else:
+                st.write("Checklist status: **Completed or partially completed**")
+                st.write(f"Checklist points: **{score_breakdown['checklist_points']}**")
             st.write(f"Total before 100-point cap: **{score_breakdown['total_before_cap']}**")
             st.write(f"Final score: **{score_breakdown['final_score']}/100**")
 
@@ -1656,13 +1665,14 @@ def show_risk_score_page():
             go_to_page("home_summary")
     if st.button("Create Safety Report →", type="primary"):
         report_text = generate_report(
-            room_type=st.session_state.get("room_type"),
-            hazards=ai_hazards,
-            checklist_answers=checklist_answers,
-            score=score,
-            risk_level=risk_level,
-            recommended_fixes=fixes,
-            safety_disclaimer=SAFETY_DISCLAIMER,
+        room_type=st.session_state.get("room_type"),
+        hazards=ai_hazards,
+        checklist_answers=checklist_answers,
+        score=score,
+        risk_level=risk_level,
+        recommended_fixes=fixes,
+        safety_disclaimer=SAFETY_DISCLAIMER,
+        checklist_was_skipped=st.session_state.get("checklist_was_skipped", False),
         )
 
         st.session_state["report_text"] = report_text

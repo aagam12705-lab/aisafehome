@@ -63,6 +63,7 @@ def generate_report(
     risk_level,
     recommended_fixes,
     safety_disclaimer,
+    checklist_was_skipped=False,
 ):
     """
     Creates a plain-English report as a string.
@@ -83,7 +84,12 @@ def generate_report(
     today = date.today().strftime("%B %d, %Y")
 
     hazard_lines = format_hazards(hazards)
-    checklist_lines = format_checklist_concerns(checklist_answers)
+    if checklist_was_skipped:
+        checklist_lines = [
+            "Checklist was skipped. This score is based only on AI photo hazards."
+        ]
+    else:
+    c   hecklist_lines = format_checklist_concerns(checklist_answers)
 
     if recommended_fixes:
         fix_lines = []
