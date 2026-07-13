@@ -2,7 +2,6 @@ import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
 from src.scoring import (
     calculate_score,
-    calculate_adjusted_score,
     get_risk_level,
     get_score_breakdown,
 )
@@ -182,8 +181,7 @@ def initialize_session_state():
     if "checklist_was_skipped" not in st.session_state:
         st.session_state["checklist_was_skipped"] = False   
 
-    if "score_adjustment" not in st.session_state:
-        st.session_state["score_adjustment"] = None      
+  
 
 
 def add_mobile_friendly_style():
@@ -1510,24 +1508,16 @@ def show_checklist_summary_page():
         ai_result = st.session_state.get("ai_result") or {}
         hazards = ai_result.get("hazards", [])
 
-        adjusted_score_result = calculate_adjusted_score(
-            hazards,
-            checklist_answers,
-            checklist_was_skipped=st.session_state.get("checklist_was_skipped", False),
-        )
+        score = calculate_score(hazards, checklist_answers)
+        risk_level = get_risk_level(score)
+        score_breakdown = get_score_breakdown(hazards, checklist_answers)
 
-    score = adjusted_score_result["final_score"]
-    risk_level = get_risk_level(score)
-    score_breakdown = get_score_breakdown(hazards, checklist_answers)
+        st.session_state["score"] = score
+        st.session_state["risk_level"] = risk_level
+        st.session_state["score_breakdown"] = score_breakdown
+        st.session_state["current_check_saved"] = False
 
-    st.session_state["score_adjustment"] = adjusted_score_result
-
-    st.session_state["score"] = score
-    st.session_state["risk_level"] = risk_level
-    st.session_state["score_breakdown"] = score_breakdown
-    st.session_state["current_check_saved"] = False
-
-    go_to_page("risk_score")
+        go_to_page("risk_score")
 
     if st.button("Edit Checklist"):
         st.session_state["checklist_index"] = 0
@@ -1567,57 +1557,32 @@ def show_risk_score_page():
 
     st.metric("Risk Score", f"{score}/100")
 
-    score_adjustment = st.session_state.get("score_adjustment")
-
-    if score_adjustment:
-        review_completeness = score_adjustment.get(
-            "review_completeness",
-            "Review completeness unknown",
+    if st.session_state.get("checklist_was_skipped"):
+        st.info(
+            "Review completeness: AI-only review. "
+            "The checklist was skipped, so this score may miss hazards that are not visible in the photo."
         )
-        base_score = score_adjustment.get("base_score", score)
-        buffer = score_adjustment.get("buffer", 0)
-
-        if buffer > 0:
-            st.info(
-                f"Review completeness: {review_completeness}. "
-                f"Base score was {base_score}/100. "
-                f"An incomplete-review buffer of +{buffer} was added because fewer than "
-                f"5 checklist questions were answered."
-            )
-        else:
-            st.info(f"Review completeness: {review_completeness}.")
     else:
-        if st.session_state.get("checklist_was_skipped"):
+        checklist_answers = st.session_state.get("checklist_answers", [])
+
+        real_answer_count = 0
+
+        for answer in checklist_answers:
+            if answer.get("answer_label") != "Skipped":
+                real_answer_count += 1
+
+        if real_answer_count == 0:
             st.info(
                 "Review completeness: AI-only review. "
-                "The checklist was skipped, so this score may miss hazards that are not visible in the photo."
+                "No checklist questions were answered."
+            )
+        elif real_answer_count < len(CHECKLIST_QUESTIONS):
+            st.info(
+                f"Review completeness: Partial checklist review. "
+                f"{real_answer_count} of {len(CHECKLIST_QUESTIONS)} checklist questions were answered."
             )
         else:
-            checklist_answers = st.session_state.get("checklist_answers", [])
-
-            real_answer_count = 0
-
-            for answer in checklist_answers:
-                if answer.get("answer_label") != "Skipped":
-                    real_answer_count += 1
-
-            if real_answer_count == 0:
-                st.info(
-                    "Review completeness: AI-only review. "
-                    "No checklist questions were answered."
-                )
-            elif real_answer_count < 5:
-                st.info(
-                    f"Review completeness: Partial checklist review. "
-                    f"Only {real_answer_count} checklist questions were answered."
-                )
-            elif real_answer_count < len(CHECKLIST_QUESTIONS):
-                st.info(
-                    f"Review completeness: Partial checklist review. "
-                    f"{real_answer_count} of {len(CHECKLIST_QUESTIONS)} checklist questions were answered."
-                )
-            else:
-                st.success("Review completeness: AI photo review + checklist review.")
+            st.success("Review completeness: AI photo review + checklist review.")
     st.progress(score)
 
     if risk_level == "Low Risk":

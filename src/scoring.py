@@ -36,10 +36,6 @@ HAZARD_POINTS = {
 }
 
 
-MIN_QUESTIONS_FOR_FULL_CHECKLIST = 5
-AVERAGE_MISSING_QUESTION_POINTS = 10
-INCOMPLETE_REVIEW_BUFFER_STRENGTH = 0.5
-MAX_INCOMPLETE_REVIEW_BUFFER = 20
 
 
 def get_checklist_answer_points(answer):
@@ -59,16 +55,6 @@ def get_checklist_answer_points(answer):
 
     return 0
 
-
-def is_real_checklist_answer(answer):
-    """
-    Returns True if the user actually answered the question.
-
-    Skipped questions do not count as real answered questions.
-    Not applicable does count because the user reviewed the question.
-    """
-
-    return answer.get("answer_label") != "Skipped"
 
 
 def calculate_score(ai_hazards, checklist_answers):
@@ -97,111 +83,6 @@ def calculate_score(ai_hazards, checklist_answers):
 
     return min(round(score), 100)
 
-
-def calculate_incomplete_review_buffer(checklist_answers):
-    """
-    Adds a small buffer when the user answered fewer than 5 checklist questions.
-
-    Rules:
-    - 0 answered questions = 0 buffer
-    - 1–4 answered questions = small buffer
-    - More concerning answers = bigger buffer
-    - 5+ answered questions = 0 buffer
-    """
-
-    real_answers = [
-        answer
-        for answer in checklist_answers
-        if is_real_checklist_answer(answer)
-    ]
-
-    answered_count = len(real_answers)
-
-    if answered_count == 0:
-        return 0
-
-    if answered_count >= MIN_QUESTIONS_FOR_FULL_CHECKLIST:
-        return 0
-
-    answered_possible_points = 0
-    answered_actual_points = 0
-
-    for answer in real_answers:
-        category = answer.get("category")
-        possible_points = HAZARD_POINTS.get(category, 0)
-
-        answered_possible_points += possible_points
-        answered_actual_points += get_checklist_answer_points(answer)
-
-    missing_needed = MIN_QUESTIONS_FOR_FULL_CHECKLIST - answered_count
-
-    # This guarantees a small buffer when only 1–4 questions are answered.
-    base_buffer = missing_needed * 2
-
-    if answered_possible_points > 0:
-        concern_rate = answered_actual_points / answered_possible_points
-    else:
-        concern_rate = 0
-
-    concern_buffer = round(
-        concern_rate
-        * missing_needed
-        * AVERAGE_MISSING_QUESTION_POINTS
-        * INCOMPLETE_REVIEW_BUFFER_STRENGTH
-    )
-
-    buffer = base_buffer + concern_buffer
-
-    return min(buffer, MAX_INCOMPLETE_REVIEW_BUFFER)
-def calculate_adjusted_score(
-    ai_hazards,
-    checklist_answers,
-    checklist_was_skipped=False,
-):
-    """
-    Calculates the final score using the best partial-checklist method.
-
-    Rules:
-    - Full checklist or 5+ answered questions: normal score
-    - 1–4 answered questions: add small incomplete-review buffer
-    - Entire checklist skipped: AI-only score, no buffer
-    """
-
-    base_score = calculate_score(ai_hazards, checklist_answers)
-
-    if checklist_was_skipped:
-        return {
-            "base_score": base_score,
-            "buffer": 0,
-            "final_score": base_score,
-            "review_completeness": "AI-only review",
-        }
-
-    real_answer_count = len(
-        [
-            answer
-            for answer in checklist_answers
-            if is_real_checklist_answer(answer)
-        ]
-    )
-
-    buffer = calculate_incomplete_review_buffer(checklist_answers)
-
-    final_score = min(base_score + buffer, 100)
-
-    if real_answer_count == 0:
-        review_completeness = "AI-only review"
-    elif real_answer_count < MIN_QUESTIONS_FOR_FULL_CHECKLIST:
-        review_completeness = "Partial checklist review"
-    else:
-        review_completeness = "AI photo review plus checklist review"
-
-    return {
-        "base_score": base_score,
-        "buffer": buffer,
-        "final_score": final_score,
-        "review_completeness": review_completeness,
-    }
 
 
 def get_risk_level(score):
