@@ -6,13 +6,6 @@ This file contains the AI SafeHome fall-hazard scoring algorithm.
 Important:
 This score is not a medical diagnosis.
 It is a simple educational home-safety hazard score.
-
-Balanced scoring rule:
-- Each hazard category is counted once.
-- AI finding = full points.
-- Checklist Yes = full points.
-- Checklist Not sure = half points.
-- If both AI and checklist identify the same category, use the higher value.
 """
 
 HAZARD_POINTS = {
@@ -43,63 +36,172 @@ HAZARD_POINTS = {
 }
 
 
-def get_checklist_points(category, response):
+MIN_QUESTIONS_FOR_FULL_CHECKLIST = 5
+AVERAGE_MISSING_QUESTION_POINTS = 10
+INCOMPLETE_REVIEW_BUFFER_STRENGTH = 0.5
+MAX_INCOMPLETE_REVIEW_BUFFER = 20
+
+
+def get_checklist_answer_points(answer):
     """
-    Converts one checklist answer into points.
+    Returns the points added by one checklist answer.
     """
 
-    base_points = HAZARD_POINTS.get(category, 0)
+    category = answer.get("category")
+    response = answer.get("answer")
+    points = HAZARD_POINTS.get(category, 0)
 
     if response == "yes":
-        return base_points
+        return points
 
     if response == "not_sure":
-        return base_points * 0.5
+        return points * 0.5
 
     return 0
 
 
+def is_real_checklist_answer(answer):
+    """
+    Returns True if the user actually answered the question.
+
+    Skipped questions do not count as real answered questions.
+    Not applicable does count because the user reviewed the question.
+    """
+
+    return answer.get("answer_label") != "Skipped"
+
+
 def calculate_score(ai_hazards, checklist_answers):
     """
-    Combines AI hazards and checklist answers into a balanced 0-100 score.
+    Combines AI hazards and checklist answers into a basic 0-100 score.
 
-    Important:
-    The same hazard category is counted only once.
+    AI hazards:
+    - Each AI hazard adds its hazard point value.
 
-    Example:
-    - AI finds cords: 12 points
-    - Checklist says cords = Yes: 12 points
-    - Final cords contribution: 12 points, not 24
+    Checklist answers:
+    - Yes = full points
+    - Not sure = half points
+    - No = 0 points
+    - Not applicable = 0 points
+    - Skipped = 0 points
     """
 
-    category_scores = {}
+    score = 0
 
-    # Add AI findings
     for hazard in ai_hazards:
         category = hazard.get("category")
-        points = HAZARD_POINTS.get(category, 0)
+        score += HAZARD_POINTS.get(category, 0)
 
-        if points > 0:
-            category_scores[category] = max(
-                category_scores.get(category, 0),
-                points,
-            )
-
-    # Add checklist findings
     for answer in checklist_answers:
+        score += get_checklist_answer_points(answer)
+
+    return min(round(score), 100)
+
+
+def calculate_incomplete_review_buffer(checklist_answers):
+    """
+    Adds a small buffer when the user answered fewer than 5 checklist questions.
+
+    This does not punish skipping by itself.
+    It only adds a buffer if the few answered questions showed concerns.
+
+    Example:
+    - 4 answered questions with mostly No answers = tiny or no buffer
+    - 2 answered questions with Yes answers = moderate buffer
+    """
+
+    real_answers = [
+        answer
+        for answer in checklist_answers
+        if is_real_checklist_answer(answer)
+    ]
+
+    answered_count = len(real_answers)
+
+    if answered_count == 0:
+        return 0
+
+    if answered_count >= MIN_QUESTIONS_FOR_FULL_CHECKLIST:
+        return 0
+
+    answered_possible_points = 0
+    answered_actual_points = 0
+
+    for answer in real_answers:
         category = answer.get("category")
-        response = answer.get("answer")
-        points = get_checklist_points(category, response)
+        possible_points = HAZARD_POINTS.get(category, 0)
 
-        if points > 0:
-            category_scores[category] = max(
-                category_scores.get(category, 0),
-                points,
-            )
+        answered_possible_points += possible_points
+        answered_actual_points += get_checklist_answer_points(answer)
 
-    total_score = sum(category_scores.values())
+    if answered_possible_points == 0:
+        return 0
 
-    return min(round(total_score), 100)
+    concern_rate = answered_actual_points / answered_possible_points
+
+    missing_needed = MIN_QUESTIONS_FOR_FULL_CHECKLIST - answered_count
+
+    buffer = (
+        concern_rate
+        * missing_needed
+        * AVERAGE_MISSING_QUESTION_POINTS
+        * INCOMPLETE_REVIEW_BUFFER_STRENGTH
+    )
+
+    buffer = round(buffer)
+
+    return min(buffer, MAX_INCOMPLETE_REVIEW_BUFFER)
+
+
+def calculate_adjusted_score(
+    ai_hazards,
+    checklist_answers,
+    checklist_was_skipped=False,
+):
+    """
+    Calculates the final score using the best partial-checklist method.
+
+    Rules:
+    - Full checklist or 5+ answered questions: normal score
+    - 1–4 answered questions: add small incomplete-review buffer
+    - Entire checklist skipped: AI-only score, no buffer
+    """
+
+    base_score = calculate_score(ai_hazards, checklist_answers)
+
+    if checklist_was_skipped:
+        return {
+            "base_score": base_score,
+            "buffer": 0,
+            "final_score": base_score,
+            "review_completeness": "AI-only review",
+        }
+
+    real_answer_count = len(
+        [
+            answer
+            for answer in checklist_answers
+            if is_real_checklist_answer(answer)
+        ]
+    )
+
+    buffer = calculate_incomplete_review_buffer(checklist_answers)
+
+    final_score = min(base_score + buffer, 100)
+
+    if real_answer_count == 0:
+        review_completeness = "AI-only review"
+    elif real_answer_count < MIN_QUESTIONS_FOR_FULL_CHECKLIST:
+        review_completeness = "Partial checklist review"
+    else:
+        review_completeness = "AI photo review plus checklist review"
+
+    return {
+        "base_score": base_score,
+        "buffer": buffer,
+        "final_score": final_score,
+        "review_completeness": review_completeness,
+    }
 
 
 def get_risk_level(score):
@@ -118,101 +220,52 @@ def get_risk_level(score):
 def get_score_breakdown(ai_hazards, checklist_answers):
     """
     Creates a detailed score breakdown for display.
-
-    This version explains balanced scoring:
-    overlapping AI/checklist categories are not double counted.
     """
 
+    ai_points = 0
+    checklist_points = 0
     ai_items = []
     checklist_items = []
-    category_scores = {}
-    category_sources = {}
 
-    raw_ai_points = 0
-    raw_checklist_points = 0
-
-    # Track AI hazard points
     for hazard in ai_hazards:
         category = hazard.get("category")
         points = HAZARD_POINTS.get(category, 0)
+        ai_points += points
 
-        if points <= 0:
-            continue
+        if points > 0:
+            ai_items.append(
+                {
+                    "source": "AI photo result",
+                    "category": category,
+                    "title": hazard.get("title", "Possible hazard"),
+                    "points": points,
+                }
+            )
 
-        raw_ai_points += points
-
-        ai_items.append(
-            {
-                "source": "AI photo result",
-                "category": category,
-                "title": hazard.get("title", "Possible hazard"),
-                "points": points,
-            }
-        )
-
-        if points > category_scores.get(category, 0):
-            category_scores[category] = points
-            category_sources[category] = "AI"
-
-    # Track checklist points
     for answer in checklist_answers:
         category = answer.get("category")
-        response = answer.get("answer")
-        points = get_checklist_points(category, response)
+        points = get_checklist_answer_points(answer)
+        checklist_points += points
 
-        if points <= 0:
-            continue
+        if points > 0:
+            checklist_items.append(
+                {
+                    "source": "Checklist",
+                    "category": category,
+                    "question": answer.get("question", "Checklist item"),
+                    "answer_label": answer.get("answer_label", answer.get("answer")),
+                    "points": points,
+                }
+            )
 
-        raw_checklist_points += points
-
-        checklist_items.append(
-            {
-                "source": "Checklist",
-                "category": category,
-                "question": answer.get("question", "Checklist item"),
-                "answer_label": answer.get("answer_label", response),
-                "points": points,
-            }
-        )
-
-        if points > category_scores.get(category, 0):
-            category_scores[category] = points
-            category_sources[category] = "Checklist"
-        elif points == category_scores.get(category, 0):
-            old_source = category_sources.get(category, "")
-            if old_source == "AI":
-                category_sources[category] = "AI + Checklist"
-
-    total_before_cap = sum(category_scores.values())
+    total_before_cap = ai_points + checklist_points
     final_score = min(round(total_before_cap), 100)
 
-    category_items = []
-
-    for category, points in category_scores.items():
-        category_items.append(
-            {
-                "category": category,
-                "points": points,
-                "source": category_sources.get(category, "Unknown"),
-            }
-        )
-
-    category_items = sorted(
-        category_items,
-        key=lambda item: item["points"],
-        reverse=True,
-    )
-
     return {
-        "ai_points": round(raw_ai_points, 1),
-        "checklist_points": round(raw_checklist_points, 1),
+        "ai_points": round(ai_points, 1),
+        "checklist_points": round(checklist_points, 1),
         "total_before_cap": round(total_before_cap, 1),
         "final_score": final_score,
         "ai_items": ai_items,
         "checklist_items": checklist_items,
-        "category_items": category_items,
-        "scoring_note": (
-            "Balanced scoring is used: each hazard category is counted once. "
-            "If AI and checklist both identify the same category, the app uses the higher value instead of double counting."
-        ),
     }
