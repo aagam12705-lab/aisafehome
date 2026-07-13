@@ -102,12 +102,11 @@ def calculate_incomplete_review_buffer(checklist_answers):
     """
     Adds a small buffer when the user answered fewer than 5 checklist questions.
 
-    This does not punish skipping by itself.
-    It only adds a buffer if the few answered questions showed concerns.
-
-    Example:
-    - 4 answered questions with mostly No answers = tiny or no buffer
-    - 2 answered questions with Yes answers = moderate buffer
+    Rules:
+    - 0 answered questions = 0 buffer
+    - 1–4 answered questions = small buffer
+    - More concerning answers = bigger buffer
+    - 5+ answered questions = 0 buffer
     """
 
     real_answers = [
@@ -134,25 +133,26 @@ def calculate_incomplete_review_buffer(checklist_answers):
         answered_possible_points += possible_points
         answered_actual_points += get_checklist_answer_points(answer)
 
-    if answered_possible_points == 0:
-        return 0
-
-    concern_rate = answered_actual_points / answered_possible_points
-
     missing_needed = MIN_QUESTIONS_FOR_FULL_CHECKLIST - answered_count
 
-    buffer = (
+    # This guarantees a small buffer when only 1–4 questions are answered.
+    base_buffer = missing_needed * 2
+
+    if answered_possible_points > 0:
+        concern_rate = answered_actual_points / answered_possible_points
+    else:
+        concern_rate = 0
+
+    concern_buffer = round(
         concern_rate
         * missing_needed
         * AVERAGE_MISSING_QUESTION_POINTS
         * INCOMPLETE_REVIEW_BUFFER_STRENGTH
     )
 
-    buffer = round(buffer)
+    buffer = base_buffer + concern_buffer
 
     return min(buffer, MAX_INCOMPLETE_REVIEW_BUFFER)
-
-
 def calculate_adjusted_score(
     ai_hazards,
     checklist_answers,
