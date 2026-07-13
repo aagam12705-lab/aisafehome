@@ -559,7 +559,7 @@ def add_mobile_friendly_style():
         img {{
             border-radius: 12px !important;
         }}
-        .priority-badge {
+        .priority-badge {{
             display: inline-block;
             border-radius: 999px;
             padding: 0.25rem 0.65rem;
@@ -569,22 +569,22 @@ def add_mobile_friendly_style():
             font-weight: 800;
             border: 2px solid var(--safe-border);
             color: var(--safe-text);
-        }
+        }}
 
-        .priority-fix-now {
+        .priority-fix-now {{
             background-color: var(--safe-soft);
             border-style: solid;
-        }
+        }}
 
-        .priority-fix-soon {
+        .priority-fix-soon {{
             background-color: var(--safe-card);
             border-style: dashed;
-        }
+        }}
 
-        .priority-watch-review {
+        .priority-watch-review {{
             background-color: var(--safe-surface);
             border-style: dotted;
-        }
+        }}
         /* Phone layout */
         @media screen and (max-width: 480px) {{
             .block-container {{
@@ -1653,7 +1653,7 @@ def show_home_summary_page():
             st.write("Possible hazards: none listed.")
 
         fixes = room.get("recommended_fixes", [])
-        
+
         if fixes:
             st.write("Recommended fixes:")
             for fix in fixes[:3]:
