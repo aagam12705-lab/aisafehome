@@ -1522,12 +1522,12 @@ def show_checklist_summary_page():
 
     st.session_state["score_adjustment"] = adjusted_score_result
 
-        st.session_state["score"] = score
-        st.session_state["risk_level"] = risk_level
-        st.session_state["score_breakdown"] = score_breakdown
-        st.session_state["current_check_saved"] = False
+    st.session_state["score"] = score
+    st.session_state["risk_level"] = risk_level
+    st.session_state["score_breakdown"] = score_breakdown
+    st.session_state["current_check_saved"] = False
 
-        go_to_page("risk_score")
+    go_to_page("risk_score")
 
     if st.button("Edit Checklist"):
         st.session_state["checklist_index"] = 0
