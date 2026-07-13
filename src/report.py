@@ -86,10 +86,20 @@ def generate_report(
     checklist_lines = format_checklist_concerns(checklist_answers)
 
     if recommended_fixes:
-        fix_lines = [
-            f"{index}. {fix}"
-            for index, fix in enumerate(recommended_fixes, start=1)
-        ]
+        fix_lines = []
+
+        for index, fix in enumerate(recommended_fixes, start=1):
+            if isinstance(fix, dict):
+                fix_text = fix.get("text", "Review this area carefully.")
+                priority = fix.get("priority", "Watch/Review")
+                source = fix.get("source", "Safety concern")
+
+                fix_lines.append(
+                    f"{index}. [{priority}] {fix_text}\n"
+                    f"   Source: {source}"
+                )
+            else:
+                fix_lines.append(f"{index}. {fix}")
     else:
         fix_lines = ["No specific fixes were generated."]
 

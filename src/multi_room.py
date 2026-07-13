@@ -67,6 +67,8 @@ def get_highest_scoring_room(room_results):
 def get_unique_fixes(room_results, limit=10):
     """
     Combines recommended fixes across all rooms and removes duplicates.
+
+    Handles both old string fixes and new dictionary fixes.
     """
 
     fixes = []
@@ -74,12 +76,45 @@ def get_unique_fixes(room_results, limit=10):
 
     for room in room_results:
         for fix in room.get("recommended_fixes", []):
-            if fix not in seen:
-                fixes.append(fix)
-                seen.add(fix)
+            if isinstance(fix, dict):
+                fix_text = fix.get("text", "Review this area carefully.")
+                priority = fix.get("priority", "Watch/Review")
+                source = fix.get("source", room.get("room_type", "Room"))
+
+                unique_key = fix_text
+
+                if unique_key not in seen:
+                    fixes.append(
+                        {
+                            "text": fix_text,
+                            "priority": priority,
+                            "source": source,
+                        }
+                    )
+                    seen.add(unique_key)
+            else:
+                if fix not in seen:
+                    fixes.append(
+                        {
+                            "text": fix,
+                            "priority": "Watch/Review",
+                            "source": room.get("room_type", "Room"),
+                        }
+                    )
+                    seen.add(fix)
+
+    priority_rank = {
+        "Fix Now": 1,
+        "Fix Soon": 2,
+        "Watch/Review": 3,
+    }
+
+    fixes = sorted(
+        fixes,
+        key=lambda item: priority_rank.get(item.get("priority", "Watch/Review"), 99),
+    )
 
     return fixes[:limit]
-
 
 def get_repeated_concerns(room_results):
     """
@@ -143,7 +178,10 @@ def build_home_summary(room_results, safety_disclaimer):
 
     if fixes:
         for index, fix in enumerate(fixes, start=1):
-            fix_lines.append(f"{index}. {fix}")
+            fix_lines.append(
+                f"{index}. [{fix.get('priority', 'Watch/Review')}] "
+                f"{fix.get('text', 'Review this area carefully.')}"
+            )
     else:
         fix_lines.append("No specific fixes were generated.")
 

@@ -16,7 +16,12 @@ from src.safety_text import (
     AI_USE_DISCLOSURE,
     FINAL_PRIVACY_SUMMARY, 
 )
-
+from src.priorities import (
+    get_priority_css_class,
+    get_priority_for_checklist_answer,
+    get_priority_for_hazard,
+    sort_by_priority,
+)
 
 ROOM_OPTIONS = [
     "Living Room",
@@ -554,7 +559,32 @@ def add_mobile_friendly_style():
         img {{
             border-radius: 12px !important;
         }}
-        
+        .priority-badge {
+            display: inline-block;
+            border-radius: 999px;
+            padding: 0.25rem 0.65rem;
+            margin-top: 0.25rem;
+            margin-bottom: 0.55rem;
+            font-size: 0.85rem;
+            font-weight: 800;
+            border: 2px solid var(--safe-border);
+            color: var(--safe-text);
+        }
+
+        .priority-fix-now {
+            background-color: var(--safe-soft);
+            border-style: solid;
+        }
+
+        .priority-fix-soon {
+            background-color: var(--safe-card);
+            border-style: dashed;
+        }
+
+        .priority-watch-review {
+            background-color: var(--safe-surface);
+            border-style: dotted;
+        }
         /* Phone layout */
         @media screen and (max-width: 480px) {{
             .block-container {{
@@ -748,8 +778,7 @@ def get_category_label(category):
 
 def render_hazard_card(hazard, number):
     """
-    Displays one hazard as a clean card without raw HTML.
-    This avoids Streamlit showing HTML code on the screen.
+    Displays one hazard as a clean Streamlit card.
     """
 
     title = hazard.get("title", "Possible hazard")
@@ -766,12 +795,24 @@ def render_hazard_card(hazard, number):
         "Review this area carefully and consider asking a qualified professional.",
     )
 
+    priority = get_priority_for_hazard(hazard)
+
     with st.container(border=True):
         st.caption(f"Hazard {number}")
         st.subheader(title)
+
         st.write(f"**Category:** {category_label}")
+
+        if priority == "Fix Now":
+            st.error(f"Priority: {priority}")
+        elif priority == "Fix Soon":
+            st.warning(f"Priority: {priority}")
+        else:
+            st.info(f"Priority: {priority}")
+
         st.write("**Why it matters:**")
         st.write(explanation)
+
         st.write("**Suggested fix:**")
         st.write(recommendation)
 
@@ -802,7 +843,7 @@ def get_checklist_concerns(checklist_answers):
 
 def get_recommended_first_fixes(ai_hazards, checklist_answers):
     """
-    Creates a short list of recommended first fixes.
+    Creates a short priority-ranked list of recommended first fixes.
     Uses AI recommendations first, then checklist-based generic fixes.
     """
 
@@ -813,20 +854,32 @@ def get_recommended_first_fixes(ai_hazards, checklist_answers):
         recommendation = hazard.get("recommendation")
 
         if recommendation and recommendation not in seen_fixes:
-            fixes.append(recommendation)
+            fixes.append(
+                {
+                    "text": recommendation,
+                    "priority": get_priority_for_hazard(hazard),
+                    "source": hazard.get("title", "AI hazard"),
+                }
+            )
             seen_fixes.add(recommendation)
 
     for answer in checklist_answers:
         if answer.get("answer") in ["yes", "not_sure"]:
             category = answer.get("category")
             recommendation = GENERIC_RECOMMENDATIONS.get(category)
+            priority = get_priority_for_checklist_answer(answer)
 
             if recommendation and recommendation not in seen_fixes:
-                fixes.append(recommendation)
+                fixes.append(
+                    {
+                        "text": recommendation,
+                        "priority": priority,
+                        "source": answer.get("question", "Checklist concern"),
+                    }
+                )
                 seen_fixes.add(recommendation)
 
-    return fixes[:5]  
-          
+    return sort_by_priority(fixes)[:5]
 def get_report_file_name(room_type):
     """
     Creates a simple safe file name for the downloaded report.
@@ -1329,7 +1382,19 @@ def show_risk_score_page():
         st.write("No specific fixes were generated.")
     else:
         for index, fix in enumerate(fixes, start=1):
-            st.write(f"{index}. {fix}")
+            priority = fix.get("priority", "Watch/Review")
+            priority_class = get_priority_css_class(priority)
+
+            st.markdown(
+                f"""
+                <div class="plain-card">
+                    <strong>{index}. {fix.get("text")}</strong><br>
+                    <div class="priority-badge {priority_class}">{priority}</div><br>
+                    <span class="small-muted">Source: {fix.get("source")}</span>
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     with st.expander("View score breakdown"):
         if score_breakdown:
@@ -1588,11 +1653,15 @@ def show_home_summary_page():
             st.write("Possible hazards: none listed.")
 
         fixes = room.get("recommended_fixes", [])
-
+        
         if fixes:
             st.write("Recommended fixes:")
             for fix in fixes[:3]:
-                st.write(f"- {fix}")
+                if isinstance(fix, dict):
+                    priority = fix.get("priority", "Watch/Review")
+                    st.write(f"- [{priority}] {fix.get('text')}")
+                else:
+                    st.write(f"- {fix}")
 
         st.divider()
 
