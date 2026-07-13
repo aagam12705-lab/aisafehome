@@ -109,6 +109,134 @@ def get_fake_analysis(room_type):
                 ),
             },
         ]
+
+    elif room_type_lower == "dining room":
+        hazards = [
+            {
+                "category": "furniture_in_path",
+                "title": "Furniture narrowing the walking path",
+                "explanation": "Chairs or table legs can make the walking path harder to navigate.",
+                "recommendation": "Push chairs in and keep a clear path around the dining table.",
+            },
+            {
+                "category": "poor_lighting",
+                "title": "Possible poor lighting near dining area",
+                "explanation": "Dim lighting can make it harder to see furniture edges or floor items.",
+                "recommendation": "Improve lighting around the dining area and walking paths.",
+            },
+        ]
+
+    elif room_type_lower == "laundry room":
+        hazards = [
+            {
+                "category": "laundry_on_floor",
+                "title": "Laundry or basket on the floor",
+                "explanation": "Clothing or baskets on the floor can create tripping hazards.",
+                "recommendation": "Keep laundry baskets and loose clothing away from walking paths.",
+            },
+            {
+                "category": "slippery_floor",
+                "title": "Possible slippery laundry room floor",
+                "explanation": "Laundry areas can become slippery if water or detergent spills occur.",
+                "recommendation": "Keep the floor dry and clean up spills quickly.",
+            },
+        ]
+
+    elif room_type_lower == "garage":
+        hazards = [
+            {
+                "category": "clutter",
+                "title": "Garage floor clutter",
+                "explanation": "Tools, boxes, or stored items on the floor can block walking paths.",
+                "recommendation": "Move stored items off the floor and keep a clear walkway.",
+            },
+            {
+                "category": "uneven_floor",
+                "title": "Possible uneven garage floor",
+                "explanation": "Garage floors may have bumps, cracks, or uneven surfaces that are easy to miss.",
+                "recommendation": "Mark or repair uneven areas and keep the walking path clear.",
+            },
+        ]
+
+    elif room_type_lower == "entryway / foyer":
+        hazards = [
+            {
+                "category": "door_mat",
+                "title": "Loose door mat",
+                "explanation": "A loose mat near an entrance can slide or catch someone's foot.",
+                "recommendation": "Use a non-slip mat or remove loose mats from the entryway.",
+            },
+            {
+                "category": "footwear",
+                "title": "Shoes near walking path",
+                "explanation": "Shoes left near the door can create a tripping hazard.",
+                "recommendation": "Store shoes on a rack or away from the walking path.",
+            },
+        ]
+
+    elif room_type_lower == "basement":
+        hazards = [
+            {
+                "category": "poor_lighting",
+                "title": "Possible poor basement lighting",
+                "explanation": "Basements can be dim, making it harder to see steps, clutter, or uneven floors.",
+                "recommendation": "Add brighter lighting near stairs and walking paths.",
+            },
+            {
+                "category": "uneven_floor",
+                "title": "Possible uneven basement floor",
+                "explanation": "Uneven or unfinished flooring can increase tripping risk.",
+                "recommendation": "Keep the path clear and mark uneven areas clearly.",
+            },
+        ]
+
+    elif room_type_lower == "outdoor walkway / porch":
+        hazards = [
+            {
+                "category": "outdoor_surface",
+                "title": "Outdoor walking surface concern",
+                "explanation": "Outdoor paths can become slippery or uneven because of water, leaves, ice, or cracks.",
+                "recommendation": "Clear the walkway and repair or mark uneven areas.",
+            },
+            {
+                "category": "poor_contrast",
+                "title": "Hard-to-see step or edge",
+                "explanation": "Outdoor step edges can be harder to see in shadows or low light.",
+                "recommendation": "Improve lighting and make step edges easier to see.",
+            },
+        ]
+
+    elif room_type_lower == "closet / storage area":
+        hazards = [
+            {
+                "category": "hard_to_reach_items",
+                "title": "Items stored too high or too low",
+                "explanation": "Items that are hard to reach can lead to unsafe reaching or bending.",
+                "recommendation": "Move commonly used items to easy-to-reach shelves.",
+            },
+            {
+                "category": "clutter",
+                "title": "Storage area clutter",
+                "explanation": "Items stored on the floor can block walking space.",
+                "recommendation": "Clear the floor and keep storage items organized.",
+            },
+        ]
+
+    elif room_type_lower == "home office":
+        hazards = [
+            {
+                "category": "cords",
+                "title": "Office cord hazard",
+                "explanation": "Computer or charger cords near a walking path can create a tripping hazard.",
+                "recommendation": "Route cords along the wall or secure them with a cord cover.",
+            },
+            {
+                "category": "open_drawers_cabinets",
+                "title": "Open drawer or cabinet",
+                "explanation": "Open drawers or cabinet doors can block walking space or catch someone's leg.",
+                "recommendation": "Keep drawers and cabinets closed when not in use.",
+            },
+        ]        
     else:
         hazards = [
             {
@@ -250,6 +378,18 @@ def clean_ai_result(result):
         "handrail",
         "bathroom_grab_bars",
         "hard_to_reach_items",
+        "threshold_trip",
+        "unstable_furniture",
+        "pet_items",
+        "footwear",
+        "low_seating",
+        "poor_contrast",
+        "uneven_floor",
+        "door_mat",
+        "furniture_in_path",
+        "outdoor_surface",
+        "laundry_on_floor",
+        "open_drawers_cabinets",
         "unclear",
     }
 

@@ -30,6 +30,18 @@ Look for these hazard categories:
 - handrail
 - bathroom_grab_bars
 - hard_to_reach_items
+- threshold_trip
+- unstable_furniture
+- pet_items
+- footwear
+- low_seating
+- poor_contrast
+- uneven_floor
+- door_mat
+- furniture_in_path
+- outdoor_surface
+- laundry_on_floor
+- open_drawers_cabinets
 - unclear
 """
 
@@ -50,7 +62,7 @@ Return JSON in this exact format:
   "summary": "short plain-English summary",
   "hazards": [
     {{
-      "category": "loose_rug | cords | clutter | poor_lighting | slippery_floor | narrow_pathway | stairs | handrail | bathroom_grab_bars | hard_to_reach_items | unclear",
+      "category": "loose_rug | cords | clutter | poor_lighting | slippery_floor | narrow_pathway | stairs | handrail | bathroom_grab_bars | hard_to_reach_items | threshold_trip | unstable_furniture | pet_items | footwear | low_seating | poor_contrast | uneven_floor | door_mat | furniture_in_path | outdoor_surface | laundry_on_floor | open_drawers_cabinets | unclear",
       "title": "short hazard title",
       "explanation": "why this may be a fall hazard",
       "recommendation": "simple suggested fix"

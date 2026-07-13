@@ -30,6 +30,14 @@ ROOM_OPTIONS = [
     "Kitchen",
     "Hallway",
     "Stairs",
+    "Dining Room",
+    "Laundry Room",
+    "Garage",
+    "Entryway / Foyer",
+    "Basement",
+    "Outdoor Walkway / Porch",
+    "Closet / Storage Area",
+    "Home Office",
     "Other",
 ]
 
@@ -61,6 +69,21 @@ CATEGORY_LABELS = {
     "handrail": "Handrail Concern",
     "bathroom_grab_bars": "Bathroom Grab Bar Concern",
     "hard_to_reach_items": "Hard-to-Reach Items",
+
+    # New expanded labels
+    "threshold_trip": "Raised Threshold or Floor Transition",
+    "unstable_furniture": "Unstable Furniture",
+    "pet_items": "Pet Items in Walking Path",
+    "footwear": "Shoes or Footwear in Walking Path",
+    "low_seating": "Low or Unsafe Seating",
+    "poor_contrast": "Poor Contrast / Hard-to-See Edges",
+    "uneven_floor": "Uneven Floor Surface",
+    "door_mat": "Loose Door Mat",
+    "furniture_in_path": "Furniture Blocking Walking Path",
+    "outdoor_surface": "Outdoor Surface Hazard",
+    "laundry_on_floor": "Laundry on Floor",
+    "open_drawers_cabinets": "Open Drawers or Cabinets",
+
     "unclear": "Unclear Hazard",
 }
 GENERIC_RECOMMENDATIONS = {
@@ -74,6 +97,20 @@ GENERIC_RECOMMENDATIONS = {
     "handrail": "Check that handrails are secure, easy to grip, and available where needed.",
     "bathroom_grab_bars": "Consider properly installed grab bars near the toilet, shower, or bathtub.",
     "hard_to_reach_items": "Move commonly used items to easy-to-reach shelves or counters.",
+
+    # New expanded recommendations
+    "threshold_trip": "Make floor transitions easier to see and keep thresholds clear.",
+    "unstable_furniture": "Secure or replace furniture that may slide, wobble, or be hard to use for support.",
+    "pet_items": "Move pet bowls, toys, beds, and leashes away from walking paths.",
+    "footwear": "Store shoes and slippers away from walkways.",
+    "low_seating": "Use stable chairs that are easier to sit in and stand up from.",
+    "poor_contrast": "Improve contrast on step edges, thresholds, or floor changes so they are easier to see.",
+    "uneven_floor": "Repair or clearly mark uneven flooring, bumps, or lifted edges.",
+    "door_mat": "Use a non-slip mat or remove loose mats from entry areas.",
+    "furniture_in_path": "Move furniture so walking paths are open and easy to navigate.",
+    "outdoor_surface": "Clear leaves, ice, water, loose mats, or uneven areas from outdoor walking surfaces.",
+    "laundry_on_floor": "Keep laundry baskets and loose clothing away from the floor and walking paths.",
+    "open_drawers_cabinets": "Keep drawers and cabinet doors closed when not in use.",
 }
 
 

@@ -26,6 +26,20 @@ CATEGORY_PRIORITY = {
     "hard_to_reach_items": PRIORITY_FIX_SOON,
 
     "unclear": PRIORITY_WATCH_REVIEW,
+    "threshold_trip": PRIORITY_FIX_NOW,
+    "uneven_floor": PRIORITY_FIX_NOW,
+    "outdoor_surface": PRIORITY_FIX_NOW,
+    "open_drawers_cabinets": PRIORITY_FIX_NOW,
+
+    "unstable_furniture": PRIORITY_FIX_SOON,
+    "door_mat": PRIORITY_FIX_SOON,
+    "furniture_in_path": PRIORITY_FIX_SOON,
+    "laundry_on_floor": PRIORITY_FIX_SOON,
+    "low_seating": PRIORITY_FIX_SOON,
+    "poor_contrast": PRIORITY_FIX_SOON,
+
+    "pet_items": PRIORITY_WATCH_REVIEW,
+    "footwear": PRIORITY_WATCH_REVIEW,
 }
 
 

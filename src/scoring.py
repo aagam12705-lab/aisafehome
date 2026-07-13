@@ -19,6 +19,20 @@ HAZARD_POINTS = {
     "handrail": 15,
     "bathroom_grab_bars": 15,
     "hard_to_reach_items": 6,
+
+    # New expanded hazard categories
+    "threshold_trip": 10,
+    "unstable_furniture": 10,
+    "pet_items": 6,
+    "footwear": 6,
+    "low_seating": 8,
+    "poor_contrast": 6,
+    "uneven_floor": 12,
+    "door_mat": 8,
+    "furniture_in_path": 8,
+    "outdoor_surface": 12,
+    "laundry_on_floor": 8,
+    "open_drawers_cabinets": 8,
 }
 
 
