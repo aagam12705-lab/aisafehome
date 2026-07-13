@@ -166,7 +166,16 @@ def initialize_session_state():
         st.session_state["home_summary_text"] = None
 
     if "current_check_saved" not in st.session_state:
-        st.session_state["current_check_saved"] = False    
+        st.session_state["current_check_saved"] = False   
+
+    if "checklist_index" not in st.session_state:
+        st.session_state["checklist_index"] = 0
+
+    if "checklist_answers_by_id" not in st.session_state:
+        st.session_state["checklist_answers_by_id"] = {}
+
+    if "checklist_was_skipped" not in st.session_state:
+        st.session_state["checklist_was_skipped"] = False     
 
 
 def add_mobile_friendly_style():
@@ -688,7 +697,14 @@ def add_mobile_friendly_style():
 def go_to_page(page_name):
     st.session_state["page"] = page_name
     st.rerun()
+def reset_checklist_progress():
+    """
+    Clears checklist progress for a new room check.
+    """
 
+    st.session_state["checklist_index"] = 0
+    st.session_state["checklist_answers_by_id"] = {}
+    st.session_state["checklist_answers"] = []
 def show_accessibility_panel():
     """
     Shows a small accessibility icon button.
@@ -793,6 +809,72 @@ def validate_uploaded_photo(uploaded_file):
 
     return True, ""
 
+
+def save_checklist_answer(question, answer_label):
+    """
+    Saves one checklist answer.
+    """
+
+    st.session_state["checklist_answers_by_id"][question["id"]] = {
+        "id": question["id"],
+        "category": question["category"],
+        "question": question["text"],
+        "answer": ANSWER_VALUE_MAP[answer_label],
+        "answer_label": answer_label,
+    }
+
+
+def skip_checklist_question(question):
+    """
+    Saves one skipped checklist question as Not applicable.
+    This adds 0 points to the score.
+    """
+
+    st.session_state["checklist_answers_by_id"][question["id"]] = {
+        "id": question["id"],
+        "category": question["category"],
+        "question": question["text"],
+        "answer": "not_applicable",
+        "answer_label": "Skipped",
+    }
+
+
+def build_ordered_checklist_answers():
+    """
+    Converts the answer dictionary into a list in the original checklist order.
+    """
+
+    ordered_answers = []
+
+    for question in CHECKLIST_QUESTIONS:
+        saved_answer = st.session_state["checklist_answers_by_id"].get(question["id"])
+
+        if saved_answer:
+            ordered_answers.append(saved_answer)
+
+    return ordered_answers
+
+
+def finish_checklist():
+    """
+    Saves checklist answers and moves to the summary page.
+    """
+
+    st.session_state["checklist_answers"] = build_ordered_checklist_answers()
+    go_to_page("checklist_summary")
+
+
+def skip_entire_checklist():
+    """
+    Skips the entire checklist.
+    The score will use AI hazards only.
+    """
+
+    st.session_state["checklist_answers"] = []
+    st.session_state["checklist_answers_by_id"] = {}
+    st.session_state["checklist_index"] = 0
+    st.session_state["checklist_was_skipped"] = True
+    go_to_page("checklist_summary")
 def open_uploaded_image_correct_orientation(uploaded_file):
     """
     Opens an uploaded image and fixes phone photo orientation.
@@ -937,6 +1019,7 @@ def reset_current_room_check():
     st.session_state["photo_uploaded"] = False
     st.session_state["ai_result"] = None
     st.session_state["checklist_answers"] = []
+    reset_checklist_progress()
     st.session_state["score"] = None
     st.session_state["risk_level"] = None
     st.session_state["score_breakdown"] = None
@@ -1201,11 +1284,13 @@ def show_ai_results_page():
     )
 
     if st.button("Continue to Checklist →", type="primary"):
+        reset_checklist_progress()
         go_to_page("checklist")
 
     if st.button("Analyze Another Photo"):
         st.session_state["ai_result"] = None
         st.session_state["checklist_answers"] = []
+        reset_checklist_progress()
         go_to_page("photo_upload")
 
     if st.button("Start Over"):
@@ -1213,13 +1298,16 @@ def show_ai_results_page():
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
         st.session_state["checklist_answers"] = []
+        reset_checklist_progress()
         go_to_page("landing")
 
 
 def show_checklist_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 4: Safety Checklist")
-    show_step_card("Step 4 of 6 — Answer checklist questions to add human review.")
+
+    show_step_card("Step 4 of 6 — Answer one checklist question at a time, or skip if needed.")
+
     room_type = st.session_state.get("room_type")
     ai_result = st.session_state.get("ai_result")
 
@@ -1246,89 +1334,168 @@ def show_checklist_page():
     )
 
     st.info(
-        "Use the checklist to catch hazards the photo analysis may miss. "
-        "Choose 'Not sure' if you cannot tell."
+        "The checklist helps catch hazards the photo analysis may miss. "
+        "You may skip individual questions or skip the checklist entirely."
     )
 
-    checklist_answers = []
+    total_questions = len(CHECKLIST_QUESTIONS)
+    current_index = st.session_state.get("checklist_index", 0)
 
-    with st.form("safety_checklist_form"):
-        for question_number, question in enumerate(CHECKLIST_QUESTIONS, start=1):
-            st.markdown(
-                f"""
-                <div class="checklist-card">
-                    <strong>Question {question_number}</strong><br>
-                    {question["text"]}
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+    if current_index >= total_questions:
+        finish_checklist()
+        return
 
-            selected_answer_label = st.radio(
-                "Choose an answer",
-                ANSWER_OPTIONS,
-                index=0,
-                key=f"checklist_{question['id']}",
-                label_visibility="collapsed",
-            )
+    current_question = CHECKLIST_QUESTIONS[current_index]
+    question_number = current_index + 1
 
-            checklist_answers.append(
-                {
-                    "id": question["id"],
-                    "category": question["category"],
-                    "question": question["text"],
-                    "answer": ANSWER_VALUE_MAP[selected_answer_label],
-                    "answer_label": selected_answer_label,
-                }
-            )
+    st.progress(question_number / total_questions)
 
-        submitted = st.form_submit_button("Save Checklist", type="primary")
+    st.caption(f"Question {question_number} of {total_questions}")
 
-    if submitted:
-        st.session_state["checklist_answers"] = checklist_answers
-        go_to_page("checklist_summary")
+    st.markdown(
+        f"""
+        <div class="checklist-card">
+            <strong>{current_question["text"]}</strong>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    saved_answer = st.session_state["checklist_answers_by_id"].get(
+        current_question["id"]
+    )
+
+    if saved_answer and saved_answer.get("answer_label") in ANSWER_OPTIONS:
+        default_index = ANSWER_OPTIONS.index(saved_answer["answer_label"])
+    else:
+        default_index = 0
+
+    selected_answer_label = st.radio(
+        "Choose an answer",
+        ANSWER_OPTIONS,
+        index=default_index,
+        key=f"checklist_wizard_{current_question['id']}_{current_index}",
+    )
+
+    save_label = "Save & Finish" if question_number == total_questions else "Save & Next"
+
+    if st.button(save_label, type="primary"):
+        save_checklist_answer(current_question, selected_answer_label)
+
+        if question_number == total_questions:
+            finish_checklist()
+        else:
+            st.session_state["checklist_index"] += 1
+            st.rerun()
+
+    if st.button("Skip This Question"):
+        skip_checklist_question(current_question)
+
+        if question_number == total_questions:
+            finish_checklist()
+        else:
+            st.session_state["checklist_index"] += 1
+            st.rerun()
+
+    if current_index > 0:
+        if st.button("← Previous Question"):
+            st.session_state["checklist_index"] -= 1
+            st.rerun()
+
+    if st.button("Skip Entire Checklist"):
+        skip_entire_checklist()
 
     if st.button("← Back to Hazard Results"):
         go_to_page("ai_results")
 
-
 def show_checklist_summary_page():
     st.title("🏠 AI SafeHome")
-    st.subheader("Checklist Saved")
+    st.subheader("Checklist Summary")
 
     checklist_answers = st.session_state.get("checklist_answers", [])
+    checklist_was_skipped = st.session_state.get("checklist_was_skipped", False)
+
+    if checklist_was_skipped:
+        st.warning(
+            "Checklist was skipped. The risk score will be based only on AI photo hazards."
+        )
+
+        if st.button("Calculate Risk Score →", type="primary"):
+            ai_result = st.session_state.get("ai_result") or {}
+            hazards = ai_result.get("hazards", [])
+
+            score = calculate_score(hazards, [])
+            risk_level = get_risk_level(score)
+            score_breakdown = get_score_breakdown(hazards, [])
+
+            st.session_state["score"] = score
+            st.session_state["risk_level"] = risk_level
+            st.session_state["score_breakdown"] = score_breakdown
+            st.session_state["current_check_saved"] = False
+
+            go_to_page("risk_score")
+
+        if st.button("Answer Checklist Instead"):
+            reset_checklist_progress()
+            go_to_page("checklist")
+
+        if st.button("Start Over"):
+            st.session_state["room_type"] = None
+            st.session_state["photo_uploaded"] = False
+            st.session_state["ai_result"] = None
+            reset_checklist_progress()
+            st.session_state["score"] = None
+            st.session_state["risk_level"] = None
+            st.session_state["score_breakdown"] = None
+            st.session_state["report_text"] = None
+            go_to_page("landing")
+
+        return
 
     if not checklist_answers:
         st.error("No checklist answers were saved.")
+
         if st.button("Return to Checklist"):
+            reset_checklist_progress()
             go_to_page("checklist")
+
+        if st.button("Skip Checklist and Score AI Results Only"):
+            skip_entire_checklist()
+
         return
 
     yes_count = 0
     not_sure_count = 0
+    skipped_count = 0
+    not_applicable_count = 0
 
     for answer in checklist_answers:
         if answer["answer"] == "yes":
             yes_count += 1
         elif answer["answer"] == "not_sure":
             not_sure_count += 1
+        elif answer.get("answer_label") == "Skipped":
+            skipped_count += 1
+        elif answer["answer"] == "not_applicable":
+            not_applicable_count += 1
 
     st.success("Your checklist answers were saved.")
 
     st.markdown(
         f"""
         <div class="plain-card">
-            <strong>Checklist concerns marked Yes:</strong> {yes_count}<br>
-            <strong>Checklist items marked Not sure:</strong> {not_sure_count}
+            <strong>Yes:</strong> {yes_count}<br>
+            <strong>Not sure:</strong> {not_sure_count}<br>
+            <strong>Skipped:</strong> {skipped_count}<br>
+            <strong>Not applicable:</strong> {not_applicable_count}
         </div>
         """,
         unsafe_allow_html=True,
     )
 
-    st.write("Checklist answers:")
-
-    for answer in checklist_answers:
-        st.write(f"- **{answer['question']}** — {answer['answer_label']}")
+    with st.expander("View checklist answers"):
+        for answer in checklist_answers:
+            st.write(f"- **{answer['question']}** — {answer['answer_label']}")
 
     if st.button("Calculate Risk Score →", type="primary"):
         ai_result = st.session_state.get("ai_result") or {}
@@ -1342,19 +1509,25 @@ def show_checklist_summary_page():
         st.session_state["risk_level"] = risk_level
         st.session_state["score_breakdown"] = score_breakdown
         st.session_state["current_check_saved"] = False
+
         go_to_page("risk_score")
 
     if st.button("Edit Checklist"):
+        st.session_state["checklist_index"] = 0
         go_to_page("checklist")
+
+    if st.button("Skip Checklist Instead"):
+        skip_entire_checklist()
 
     if st.button("Start Over"):
         st.session_state["room_type"] = None
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
-        st.session_state["checklist_answers"] = []
+        reset_checklist_progress()
         st.session_state["score"] = None
         st.session_state["risk_level"] = None
         st.session_state["score_breakdown"] = None
+        st.session_state["report_text"] = None
         go_to_page("landing")
 
 def show_risk_score_page():
@@ -1503,6 +1676,7 @@ def show_risk_score_page():
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
         st.session_state["checklist_answers"] = []
+        reset_checklist_progress()
         st.session_state["score"] = None
         st.session_state["risk_level"] = None
         st.session_state["score_breakdown"] = None
@@ -1619,6 +1793,7 @@ def show_safety_report_page():
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
         st.session_state["checklist_answers"] = []
+        reset_checklist_progress()
         st.session_state["score"] = None
         st.session_state["risk_level"] = None
         st.session_state["score_breakdown"] = None
@@ -1630,6 +1805,7 @@ def show_safety_report_page():
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
         st.session_state["checklist_answers"] = []
+        reset_checklist_progress()
         st.session_state["score"] = None
         st.session_state["risk_level"] = None
         st.session_state["score_breakdown"] = None
