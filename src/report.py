@@ -36,7 +36,7 @@ def format_hazards(hazards):
 
 def format_checklist_concerns(checklist_answers):
     """
-    Returns only checklist answers that were Yes or Not sure.
+    Returns only checklist answers that were Yes, Not sure, or skipped.
     """
 
     concerns = []
@@ -45,7 +45,7 @@ def format_checklist_concerns(checklist_answers):
         response = answer.get("answer")
         answer_label = answer.get("answer_label", response)
 
-        if response in ["yes", "not_sure"]:
+        if response in ["yes", "not_sure"] or answer_label == "Skipped":
             question = answer.get("question", "Checklist concern")
             concerns.append(f"- {question} Answer: {answer_label}")
 
@@ -53,6 +53,36 @@ def format_checklist_concerns(checklist_answers):
         return ["No checklist concerns were marked Yes or Not sure."]
 
     return concerns
+
+
+def format_recommended_fixes(recommended_fixes):
+    """
+    Formats recommended fixes.
+
+    Supports both:
+    - old format: plain strings
+    - new format: dictionaries with text, priority, and source
+    """
+
+    if not recommended_fixes:
+        return ["No specific fixes were generated."]
+
+    fix_lines = []
+
+    for index, fix in enumerate(recommended_fixes, start=1):
+        if isinstance(fix, dict):
+            fix_text = fix.get("text", "Review this area carefully.")
+            priority = fix.get("priority", "Watch/Review")
+            source = fix.get("source", "Safety concern")
+
+            fix_lines.append(
+                f"{index}. [{priority}] {fix_text}\n"
+                f"   Source: {source}"
+            )
+        else:
+            fix_lines.append(f"{index}. {fix}")
+
+    return fix_lines
 
 
 def generate_report(
@@ -76,6 +106,7 @@ def generate_report(
         risk_level: Low Risk, Moderate Risk, or High Risk.
         recommended_fixes: List of suggested fixes.
         safety_disclaimer: Safety disclaimer text.
+        checklist_was_skipped: Whether the checklist was skipped.
 
     Returns:
         str: Full report text.
@@ -84,30 +115,15 @@ def generate_report(
     today = date.today().strftime("%B %d, %Y")
 
     hazard_lines = format_hazards(hazards)
+
     if checklist_was_skipped:
         checklist_lines = [
             "Checklist was skipped. This score is based only on AI photo hazards."
         ]
     else:
-    c   hecklist_lines = format_checklist_concerns(checklist_answers)
+        checklist_lines = format_checklist_concerns(checklist_answers)
 
-    if recommended_fixes:
-        fix_lines = []
-
-        for index, fix in enumerate(recommended_fixes, start=1):
-            if isinstance(fix, dict):
-                fix_text = fix.get("text", "Review this area carefully.")
-                priority = fix.get("priority", "Watch/Review")
-                source = fix.get("source", "Safety concern")
-
-                fix_lines.append(
-                    f"{index}. [{priority}] {fix_text}\n"
-                    f"   Source: {source}"
-                )
-            else:
-                fix_lines.append(f"{index}. {fix}")
-    else:
-        fix_lines = ["No specific fixes were generated."]
+    fix_lines = format_recommended_fixes(recommended_fixes)
 
     report = f"""
 AI SafeHome Safety Report
@@ -118,6 +134,9 @@ Room Checked:
 
 Fall-Hazard Score:
 {risk_level} — {score}/100
+
+Review Completeness:
+{"AI-only review. Checklist was skipped." if checklist_was_skipped else "AI photo review plus checklist review."}
 
 Possible Hazards Found by AI:
 {chr(10).join(hazard_lines)}
