@@ -5,6 +5,11 @@ from src.scoring import (
     get_risk_level,
     get_score_breakdown,
 )
+from src.database import (
+    get_database_status_message,
+    is_database_enabled,
+    save_room_check,
+)
 from src.multi_room import build_home_summary, get_home_priority_label
 from src.ai_analysis import analyze_photo
 from src.report import generate_report
@@ -180,7 +185,11 @@ def initialize_session_state():
 
     if "checklist_was_skipped" not in st.session_state:
         st.session_state["checklist_was_skipped"] = False   
+    if "database_save_complete" not in st.session_state:
+        st.session_state["database_save_complete"] = False
 
+    if "database_save_id" not in st.session_state:
+        st.session_state["database_save_id"] = None
   
 
 
@@ -1031,7 +1040,8 @@ def reset_current_room_check():
     st.session_state["score_breakdown"] = None
     st.session_state["report_text"] = None
     st.session_state["current_check_saved"] = False
-
+    st.session_state["database_save_complete"] = False
+    st.session_state["database_save_id"] = None
 
 def clear_home_summary():
     """
@@ -1101,7 +1111,37 @@ def show_room_results_count():
     else:
         st.info(f"{saved_count} rooms have been saved to the home summary.")
 
+def get_current_database_save_payload():
+    """
+    Collects the current completed room-check data for database saving.
 
+    This does not include photos or personal information.
+    """
+
+    ai_result = st.session_state.get("ai_result") or {}
+    hazards = ai_result.get("hazards", [])
+
+    checklist_answers = st.session_state.get("checklist_answers", [])
+    score = st.session_state.get("score")
+    risk_level = st.session_state.get("risk_level")
+    room_type = st.session_state.get("room_type")
+
+    recommended_fixes = get_recommended_first_fixes(
+        hazards,
+        checklist_answers,
+    )
+
+    return {
+        "room_type": room_type,
+        "score": score,
+        "risk_level": risk_level,
+        "hazards": hazards,
+        "checklist_answers": checklist_answers,
+        "recommended_fixes": recommended_fixes,
+        "checklist_was_skipped": st.session_state.get("checklist_was_skipped", False),
+        "using_demo_sample": st.session_state.get("using_demo_sample", False),
+        "demo_sample_name": st.session_state.get("demo_sample_name"),
+    }
 def get_home_summary_file_name():
     """
     Creates a simple download file.
@@ -1308,7 +1348,98 @@ def show_ai_results_page():
         reset_checklist_progress()
         go_to_page("landing")
 
+def show_database_save_panel():
+    """
+    Shows the database save panel after a score has been calculated.
 
+    Saves anonymous room-check results only.
+    Does not save uploaded photos or personal information.
+    """
+
+    st.subheader("Save Anonymous Result")
+
+    st.caption(get_database_status_message())
+
+    if not is_database_enabled():
+        st.info(
+            "Database saving is currently disabled. "
+            "The app still works normally without saving results."
+        )
+        return
+
+    score = st.session_state.get("score")
+    risk_level = st.session_state.get("risk_level")
+    room_type = st.session_state.get("room_type")
+
+    if score is None or risk_level is None or not room_type:
+        st.warning("Calculate a risk score before saving a result.")
+        return
+
+    if st.session_state.get("database_save_complete"):
+        st.success(
+            "This room check has already been saved anonymously. "
+            "No photo or personal information was stored."
+        )
+
+        saved_id = st.session_state.get("database_save_id")
+
+        if saved_id:
+            st.caption(f"Saved result ID: {saved_id}")
+
+        return
+
+    st.warning(
+        "This saves anonymous room-check results only. "
+        "Do not save real patient information, names, addresses, faces, "
+        "mail, bills, medication bottles, medical documents, or medical history. "
+        "Uploaded photos are not stored."
+    )
+
+    safety_confirmed = st.checkbox(
+        "I confirm this result contains no personal, medical, or real patient information.",
+        key="database_safety_confirmed",
+    )
+
+    if st.button("Save Anonymous Result", type="primary"):
+        if not safety_confirmed:
+            st.error(
+                "Please confirm that this result contains no personal, medical, "
+                "or real patient information before saving."
+            )
+            return
+
+        payload = get_current_database_save_payload()
+
+        try:
+            saved_id = save_room_check(
+                room_type=payload["room_type"],
+                score=payload["score"],
+                risk_level=payload["risk_level"],
+                hazards=payload["hazards"],
+                checklist_answers=payload["checklist_answers"],
+                recommended_fixes=payload["recommended_fixes"],
+                checklist_was_skipped=payload["checklist_was_skipped"],
+                safety_confirmed=safety_confirmed,
+                using_demo_sample=payload["using_demo_sample"],
+                demo_sample_name=payload["demo_sample_name"],
+            )
+
+            st.session_state["database_save_complete"] = True
+            st.session_state["database_save_id"] = saved_id
+
+            st.success(
+                "Anonymous room check saved. "
+                "No photo or personal information was stored."
+            )
+
+        except Exception as error:
+            st.error(
+                "Could not save this result. "
+                "The app still works, but this check was not stored."
+            )
+
+            with st.expander("Technical details"):
+                st.code(str(error))
 def show_checklist_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 4: Safety Checklist")
@@ -1672,6 +1803,8 @@ def show_risk_score_page():
         "AI may miss hazards. Please review the room yourself and consider asking "
         "a qualified professional for serious safety concerns."
     )
+    st.divider()
+    show_database_save_panel()
     st.subheader("Multi-Room Home Summary")
 
     show_room_results_count()
@@ -1798,8 +1931,11 @@ def show_safety_report_page():
     )
 
     st.info(
-        "AI SafeHome does not save this report to a database. If you want to keep it, download, print, or save it yourself."
+        "AI SafeHome does not save uploaded photos. "
+        "If database saving is enabled, the app can save anonymous room-check results only."
     )
+    st.divider()
+    show_database_save_panel()
     st.subheader("Multi-Room Home Summary")
 
     show_room_results_count()
