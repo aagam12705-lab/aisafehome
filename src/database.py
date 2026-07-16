@@ -24,7 +24,7 @@ Never store:
 """
 
 import os
-from typing import Any
+from typing import Any, Optional, Union
 
 from dotenv import load_dotenv
 from supabase import Client, create_client
@@ -33,7 +33,7 @@ from supabase import Client, create_client
 load_dotenv()
 
 
-def get_env_value(name: str, default: str | None = None) -> str | None:
+def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
     """
     Reads a setting from environment variables.
 
@@ -166,7 +166,7 @@ def build_room_check_payload(
     checklist_was_skipped: bool,
     safety_confirmed: bool,
     using_demo_sample: bool = False,
-    demo_sample_name: str | None = None,
+    demo_sample_name: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Creates the main row for the room_checks table.
@@ -237,7 +237,7 @@ def build_checklist_detail_row(
 
 def build_fix_detail_row(
     room_check_id: str,
-    fix: dict[str, Any] | str,
+    fix: Union[dict[str, Any], str],
 ) -> dict[str, Any]:
     """
     Creates one recommended_fix row for room_check_details.
@@ -272,7 +272,7 @@ def build_detail_rows(
     room_check_id: str,
     hazards: list[dict[str, Any]],
     checklist_answers: list[dict[str, Any]],
-    recommended_fixes: list[dict[str, Any] | str],
+    recommended_fixes: list[Union[dict[str, Any], str]],
 ) -> list[dict[str, Any]]:
     """
     Creates all room_check_details rows for one saved room check.
@@ -298,11 +298,11 @@ def save_room_check(
     risk_level: str,
     hazards: list[dict[str, Any]],
     checklist_answers: list[dict[str, Any]],
-    recommended_fixes: list[dict[str, Any] | str],
+    recommended_fixes: list[Union[dict[str, Any], str]],
     checklist_was_skipped: bool,
     safety_confirmed: bool,
     using_demo_sample: bool = False,
-    demo_sample_name: str | None = None,
+    demo_sample_name: Optional[str] = None,
 ) -> str:
     """
     Saves one anonymous room check and its details.
