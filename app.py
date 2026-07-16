@@ -1145,7 +1145,7 @@ def get_current_database_save_payload():
         "using_demo_sample": st.session_state.get("using_demo_sample", False),
         "demo_sample_name": st.session_state.get("demo_sample_name"),
     }
-    def safe_text(value):
+def safe_text(value):
     """
     Escapes text before showing it inside custom HTML.
 
