@@ -84,6 +84,41 @@ Database saving is controlled by:
 
 ```bash
 DATABASE_ENABLED=false
+## Database Privacy
+
+AI SafeHome includes optional database access for anonymous testing and validation results.
+
+The database may store:
+
+- Room type
+- Score
+- Risk label
+- Hazard categories
+- Hazard titles
+- Checklist answers
+- Recommendations
+- AI mode
+- Timestamp
+
+The database does not store:
+
+- Uploaded photos
+- Names
+- Addresses
+- Ages
+- Medical history
+- Medication lists
+- Real patient photos
+- Faces
+- Mail
+- Bills
+- Medication bottles
+- Medical documents
+
+Database saving is controlled by:
+
+```bash
+DATABASE_ENABLED=true
 ## How to Run Locally
 
 ```bash

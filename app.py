@@ -1055,7 +1055,43 @@ def clear_home_summary():
     st.session_state["home_summary_text"] = None
     st.session_state["current_check_saved"] = False
 
+def show_database_privacy_notice():
+    """
+    Shows a clear database privacy notice.
 
+    This explains what database saving does and does not store.
+    """
+
+    with st.expander("Database privacy notice"):
+        st.write(
+            "AI SafeHome can optionally save anonymous room-check results "
+            "for testing and project validation."
+        )
+
+        st.write("**The database may save:**")
+        st.write("- Room type")
+        st.write("- Score and risk label")
+        st.write("- Hazard categories and titles")
+        st.write("- Checklist answers")
+        st.write("- Recommendations")
+        st.write("- AI mode")
+        st.write("- Timestamp")
+
+        st.write("**The database must not save:**")
+        st.write("- Uploaded photos")
+        st.write("- Names")
+        st.write("- Addresses")
+        st.write("- Ages")
+        st.write("- Medical history")
+        st.write("- Medication lists")
+        st.write("- Faces")
+        st.write("- Mail, bills, medication bottles, or medical documents")
+
+        st.warning(
+            "AI SafeHome is an educational home-safety tool. "
+            "It does not diagnose medical risk, predict individual fall risk, "
+            "or guarantee fall prevention."
+        )
 def get_current_room_result():
     """
     Builds a saved result dictionary for the current completed room.
@@ -1291,6 +1327,7 @@ def show_landing_page():
         "Version 1 uses staged, non-patient photos only. "
         "No login. No database. No stored photos."
     )
+    show_database_privacy_notice()
 
 
 def show_room_selection_page():
@@ -1522,7 +1559,7 @@ def show_database_save_panel():
         "mail, bills, medication bottles, medical documents, or medical history. "
         "Uploaded photos are not stored."
     )
-
+    show_database_privacy_notice()
     safety_confirmed = st.checkbox(
         "I confirm this result contains no personal, medical, or real patient information.",
         key="database_safety_confirmed",
@@ -1580,7 +1617,7 @@ def show_saved_results_page():
         "Uploaded photos, names, addresses, medical history, medication lists, "
         "faces, mail, bills, and medical documents should not be stored."
     )
-
+    show_database_privacy_notice()
     if not is_database_enabled():
         st.info(
             "Database saving is disabled. Enable DATABASE_ENABLED=true to view saved results."
