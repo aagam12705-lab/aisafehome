@@ -47,6 +47,43 @@ The app does not diagnose medical risk, does not guarantee fall prevention, and 
 - GitHub
 - Streamlit Community Cloud or Render
 
+## Database Access Plan
+
+AI SafeHome may include database access for anonymous testing and validation results.
+
+The database is not used to store photos or personal information.
+
+Allowed database data:
+
+- Room type
+- Score
+- Risk label
+- Hazard categories
+- Hazard titles
+- Checklist answers
+- Recommendations
+- AI mode
+- Timestamp
+
+Not allowed database data:
+
+- Uploaded photos
+- Names
+- Addresses
+- Ages
+- Medical history
+- Medication lists
+- Real patient photos
+- Faces
+- Mail
+- Bills
+- Medication bottles
+- Medical documents
+
+Database saving is controlled by:
+
+```bash
+DATABASE_ENABLED=false
 ## How to Run Locally
 
 ```bash
