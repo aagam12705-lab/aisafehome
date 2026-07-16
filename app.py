@@ -1281,6 +1281,12 @@ def show_landing_page():
     if st.button("Start Safety Check", type="primary"):
         go_to_page("room_selection")
 
+    if st.button(
+        "View Saved Results Dashboard",
+        key="view_saved_results_dashboard_from_landing",
+    ):
+        go_to_page("saved_results")
+
     st.caption(
         "Version 1 uses staged, non-patient photos only. "
         "No login. No database. No stored photos."
@@ -1459,20 +1465,33 @@ def show_ai_results_page():
 
 def show_database_save_panel():
     """
-    Shows the database save panel after a score has been calculated.
+    Shows database tools after a score has been calculated.
 
     Saves anonymous room-check results only.
     Does not save uploaded photos or personal information.
+
+    Important fix:
+    The dashboard button is outside the save-button block and before early returns,
+    so it is always reachable.
     """
 
-    st.subheader("Save Anonymous Result")
-
+    st.subheader("Database Tools")
     st.caption(get_database_status_message())
+
+    if st.button(
+        "View Saved Results Dashboard",
+        key="view_saved_results_dashboard_from_database_panel",
+    ):
+        go_to_page("saved_results")
+
+    st.divider()
+    st.subheader("Save Anonymous Result")
 
     if not is_database_enabled():
         st.info(
             "Database saving is currently disabled. "
-            "The app still works normally without saving results."
+            "The dashboard can still open, but it will not load saved rows until "
+            "DATABASE_ENABLED=true."
         )
         return
 
@@ -1549,8 +1568,7 @@ def show_database_save_panel():
 
             with st.expander("Technical details"):
                 st.code(str(error))
-        if st.button("View Saved Results Dashboard"):
-            go_to_page("saved_results")            
+
 def show_saved_results_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Saved Results Dashboard")
