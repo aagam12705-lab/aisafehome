@@ -1,3 +1,4 @@
+import html
 import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
 from src.scoring import (
@@ -6,6 +7,8 @@ from src.scoring import (
     get_score_breakdown,
 )
 from src.database import (
+    fetch_recent_room_checks,
+    fetch_summary_stats,
     get_database_status_message,
     is_database_enabled,
     save_room_check,
@@ -1142,6 +1145,112 @@ def get_current_database_save_payload():
         "using_demo_sample": st.session_state.get("using_demo_sample", False),
         "demo_sample_name": st.session_state.get("demo_sample_name"),
     }
+    def safe_text(value):
+    """
+    Escapes text before showing it inside custom HTML.
+
+    This keeps dashboard cards safer if database text contains unusual characters.
+    """
+
+    if value is None:
+        return "None"
+
+    return html.escape(str(value))
+
+
+def format_database_datetime(value):
+    """
+    Makes a Supabase timestamp easier to read.
+    """
+
+    if not value:
+        return "Unknown time"
+
+    return str(value).replace("T", " ").replace("+00:00", " UTC")
+
+
+def show_saved_results_metrics(stats):
+    """
+    Shows top-level saved-result metrics.
+    """
+
+    total_checks = stats.get("total_checks", 0)
+    average_score = stats.get("average_score", 0)
+    high_risk_count = stats.get("high_risk_count", 0)
+    most_common_room = stats.get("most_common_room") or "None yet"
+
+    col1, col2, col3, col4 = st.columns(4)
+
+    with col1:
+        st.metric("Saved Checks", total_checks)
+
+    with col2:
+        st.metric("Average Score", f"{average_score}/100")
+
+    with col3:
+        st.metric("High Risk Rooms", high_risk_count)
+
+    with col4:
+        st.metric("Most Common Room", most_common_room)
+
+
+def show_saved_results_risk_breakdown(stats):
+    """
+    Shows low/moderate/high saved-result counts.
+    """
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Risk Label Breakdown</strong><br>
+            Low Risk: {stats.get("low_risk_count", 0)}<br>
+            Moderate Risk: {stats.get("moderate_risk_count", 0)}<br>
+            High Risk: {stats.get("high_risk_count", 0)}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def show_recent_saved_room_checks(rows):
+    """
+    Shows recent anonymous saved room checks.
+    """
+
+    if not rows:
+        st.info("No saved anonymous room checks yet.")
+        return
+
+    for index, row in enumerate(rows, start=1):
+        created_at = format_database_datetime(row.get("created_at"))
+        room_type = safe_text(row.get("room_type", "Unknown Room"))
+        risk_level = safe_text(row.get("risk_level", "Unknown"))
+        ai_mode = safe_text(row.get("ai_mode", "unknown"))
+
+        score = row.get("score", 0)
+        hazard_count = row.get("hazard_count", 0)
+        checklist_was_skipped = row.get("checklist_was_skipped", False)
+        safety_confirmed = row.get("safety_confirmed", False)
+
+        checklist_text = "Yes" if checklist_was_skipped else "No"
+        safety_text = "Yes" if safety_confirmed else "No"
+
+        st.markdown(
+            f"""
+            <div class="plain-card">
+                <strong>Saved Check {index}</strong><br>
+                Room: {room_type}<br>
+                Score: {score}/100<br>
+                Risk Label: {risk_level}<br>
+                AI Mode: {ai_mode}<br>
+                Hazards Saved: {hazard_count}<br>
+                Checklist Skipped: {checklist_text}<br>
+                Anonymous Safety Confirmed: {safety_text}<br>
+                Saved At: {safe_text(created_at)}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 def get_home_summary_file_name():
     """
     Creates a simple download file.
@@ -1440,6 +1549,72 @@ def show_database_save_panel():
 
             with st.expander("Technical details"):
                 st.code(str(error))
+        if st.button("View Saved Results Dashboard"):
+            go_to_page("saved_results")            
+def show_saved_results_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Saved Results Dashboard")
+
+    st.caption(get_database_status_message())
+
+    st.warning(
+        "This dashboard shows anonymous room-check results only. "
+        "Uploaded photos, names, addresses, medical history, medication lists, "
+        "faces, mail, bills, and medical documents should not be stored."
+    )
+
+    if not is_database_enabled():
+        st.info(
+            "Database saving is disabled. Enable DATABASE_ENABLED=true to view saved results."
+        )
+
+        if st.button("← Back to Landing Page"):
+            go_to_page("landing")
+
+        return
+
+    try:
+        stats = fetch_summary_stats()
+        recent_rows = fetch_recent_room_checks(limit=25)
+
+    except Exception as error:
+        st.error(
+            "Could not load saved results. Check your Supabase settings and database tables."
+        )
+
+        with st.expander("Technical details"):
+            st.code(str(error))
+
+        if st.button("← Back to Landing Page"):
+            go_to_page("landing")
+
+        return
+
+    show_saved_results_metrics(stats)
+
+    st.divider()
+
+    show_saved_results_risk_breakdown(stats)
+
+    st.divider()
+
+    st.subheader("Recent Anonymous Room Checks")
+
+    show_recent_saved_room_checks(recent_rows)
+
+    st.divider()
+
+    if st.button("Refresh Dashboard"):
+        st.rerun()
+
+    if st.button("Start New Safety Check"):
+        if "reset_current_room_check" in globals():
+            reset_current_room_check()
+
+        go_to_page("room_selection")
+
+    if st.button("← Back to Landing Page"):
+        go_to_page("landing")
 def show_checklist_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 4: Safety Checklist")
@@ -2124,6 +2299,8 @@ def main():
         show_safety_report_page()   
     elif current_page == "home_summary":
         show_home_summary_page()     
+    elif current_page == "saved_results":
+        show_saved_results_page()    
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"
