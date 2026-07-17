@@ -9,12 +9,15 @@ from src.scoring import (
     get_score_breakdown,
 )
 from src.database import (
+    create_home_id,
     fetch_room_check_by_id,
     fetch_room_check_details,
     fetch_room_checks_by_home_id,
     fetch_summary_stats_for_home,
     get_database_status_message,
+    home_id_exists,
     is_database_enabled,
+    is_home_id_available,
     is_valid_home_id,
     save_room_check,
 )
@@ -205,6 +208,18 @@ def initialize_session_state():
 
     if "home_login_error" not in st.session_state:
         st.session_state["home_login_error"] = None
+
+    if "home_id" not in st.session_state:
+        st.session_state["home_id"] = None
+
+    if "home_login_error" not in st.session_state:
+        st.session_state["home_login_error"] = None
+
+    if "home_login_message" not in st.session_state:
+        st.session_state["home_login_message"] = None
+
+    if "last_created_home_id" not in st.session_state:
+        st.session_state["last_created_home_id"] = None    
   
 
 
@@ -912,12 +927,26 @@ def group_saved_result_details(details):
 
     return grouped
 
+def clean_home_id_input(home_id):
+    """
+    Cleans user-entered Home ID text.
+
+    This does not create a Home ID.
+    It only prepares the text for validation.
+    """
+
+    if not home_id:
+        return ""
+
+    return str(home_id).strip().upper()
+
+
 def generate_home_id():
     """
-    Creates an anonymous Home ID.
+    Creates a random anonymous Home ID.
 
-    This is not personal information.
-    Example: HOME-8K2M-Q9PA-W4ZT
+    Example:
+    HOME-8K2M-Q9PA-W4ZT
     """
 
     alphabet = string.ascii_uppercase + string.digits
@@ -931,22 +960,12 @@ def generate_home_id():
     return "HOME-" + "-".join(parts)
 
 
-def log_in_with_home_id(home_id):
+def get_logged_in_home_id():
     """
-    Saves the Home ID in Streamlit session state.
+    Returns the current Home ID, if one is logged in.
     """
 
-    cleaned_home_id = str(home_id).strip().upper()
-
-    if not is_valid_home_id(cleaned_home_id):
-        st.session_state["home_login_error"] = (
-            "Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT."
-        )
-        return False
-
-    st.session_state["home_id"] = cleaned_home_id
-    st.session_state["home_login_error"] = None
-    return True
+    return st.session_state.get("home_id")
 
 
 def log_out_home_id():
@@ -956,19 +975,143 @@ def log_out_home_id():
 
     st.session_state["home_id"] = None
     st.session_state["home_login_error"] = None
+    st.session_state["home_login_message"] = None
+    st.session_state["last_created_home_id"] = None
 
 
-def get_logged_in_home_id():
+def log_in_with_home_id(home_id):
     """
-    Returns the current Home ID, if logged in.
+    Logs in with an existing Home ID.
+
+    The database must confirm that the Home ID exists.
     """
 
-    return st.session_state.get("home_id")
+    cleaned_home_id = clean_home_id_input(home_id)
+
+    if not is_valid_home_id(cleaned_home_id):
+        st.session_state["home_login_error"] = (
+            "Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT."
+        )
+        st.session_state["home_login_message"] = None
+        return False
+
+    try:
+        exists = home_id_exists(cleaned_home_id)
+
+    except Exception as error:
+        st.session_state["home_login_error"] = (
+            "Could not check this Home ID. Check your database connection."
+        )
+        st.session_state["home_login_message"] = str(error)
+        return False
+
+    if not exists:
+        st.session_state["home_login_error"] = (
+            "No saved Home ID was found with that code. Create it first or check your spelling."
+        )
+        st.session_state["home_login_message"] = None
+        return False
+
+    st.session_state["home_id"] = cleaned_home_id
+    st.session_state["home_login_error"] = None
+    st.session_state["home_login_message"] = "Home ID login successful."
+    return True
 
 
-def show_home_id_status():
+def create_random_available_home_id():
     """
-    Shows the current Home ID status.
+    Generates, checks, creates, and logs in with a new random Home ID.
+
+    Tries multiple times in the extremely unlikely case of a collision.
+    """
+
+    if not is_database_enabled():
+        raise RuntimeError("Database saving is disabled, so a Home ID cannot be created.")
+
+    for _ in range(10):
+        candidate = generate_home_id()
+
+        if is_home_id_available(candidate):
+            created_home_id = create_home_id(candidate)
+
+            st.session_state["home_id"] = created_home_id
+            st.session_state["last_created_home_id"] = created_home_id
+            st.session_state["home_login_error"] = None
+            st.session_state["home_login_message"] = "New Home ID created."
+
+            return created_home_id
+
+    raise RuntimeError("Could not create a unique Home ID. Try again.")
+
+
+def create_custom_home_id(home_id):
+    """
+    Creates and logs in with a custom Home ID chosen by the user.
+    """
+
+    cleaned_home_id = clean_home_id_input(home_id)
+
+    if not is_valid_home_id(cleaned_home_id):
+        st.session_state["home_login_error"] = (
+            "Invalid Home ID. Use the format HOME-ABCD-1234-WXYZ."
+        )
+        st.session_state["home_login_message"] = None
+        return False
+
+    try:
+        if not is_home_id_available(cleaned_home_id):
+            st.session_state["home_login_error"] = (
+                "That Home ID is already taken. Choose a different one."
+            )
+            st.session_state["home_login_message"] = None
+            return False
+
+        created_home_id = create_home_id(cleaned_home_id)
+
+        st.session_state["home_id"] = created_home_id
+        st.session_state["last_created_home_id"] = created_home_id
+        st.session_state["home_login_error"] = None
+        st.session_state["home_login_message"] = "Custom Home ID created."
+
+        return True
+
+    except Exception as error:
+        st.session_state["home_login_error"] = (
+            "Could not create this Home ID. Check your database connection."
+        )
+        st.session_state["home_login_message"] = str(error)
+        return False
+
+
+def check_home_id_availability_for_ui(home_id):
+    """
+    Checks whether a custom Home ID is available and shows a UI message.
+    """
+
+    cleaned_home_id = clean_home_id_input(home_id)
+
+    if not is_valid_home_id(cleaned_home_id):
+        st.error("Invalid format. Use something like HOME-ABCD-1234-WXYZ.")
+        return
+
+    try:
+        available = is_home_id_available(cleaned_home_id)
+
+        if available:
+            st.success("This Home ID is available.")
+        else:
+            st.error("This Home ID is already taken.")
+
+    except Exception as error:
+        st.error("Could not check availability.")
+
+        with st.expander("Technical details"):
+            st.code(str(error))
+
+
+def show_home_id_status(key_suffix="main"):
+    """
+    Shows whether a Home ID is currently logged in.
     """
 
     home_id = get_logged_in_home_id()
@@ -980,46 +1123,125 @@ def show_home_id_status():
             "Save this Home ID somewhere safe. Anyone with this code can view checks saved under it."
         )
 
-        if st.button("Log Out of Home ID"):
+        if st.button("Log Out of Home ID", key=f"log_out_home_id_{key_suffix}"):
             log_out_home_id()
             st.rerun()
     else:
         st.info("No Home ID is logged in yet.")
 
 
-def show_home_id_login_box():
+def show_home_id_login_box(key_prefix="home_id"):
     """
-    Lets the user create or enter a Home ID.
+    Lets the user create a new Home ID or log in with an existing one.
+
+    A Home ID is an anonymous access code.
+    It must not include names, addresses, or personal information.
     """
 
     st.subheader("Home ID Login")
 
     st.write(
-        "Use a Home ID to save and view anonymous checks for one home/session. "
+        "Use a Home ID to save and view anonymous room checks for one home. "
         "Do not use a name, address, or personal information."
     )
 
-    if st.button("Create New Home ID"):
-        new_home_id = generate_home_id()
-        st.session_state["home_id"] = new_home_id
-        st.session_state["home_login_error"] = None
-        st.success(f"New Home ID created: {new_home_id}")
-        st.warning("Copy this Home ID now. You need it later to view saved checks.")
-
-    entered_home_id = st.text_input(
-        "Enter existing Home ID",
-        placeholder="HOME-8K2M-Q9PA-W4ZT",
+    st.warning(
+        "A Home ID is not a password. Anyone with the Home ID can view checks saved under it."
     )
 
-    if st.button("Log In with Home ID"):
-        logged_in = log_in_with_home_id(entered_home_id)
+    st.caption(get_database_status_message())
 
-        if logged_in:
-            st.success("Home ID login successful.")
-            st.rerun()
+    if not is_database_enabled():
+        st.info(
+            "Database saving is disabled. Enable DATABASE_ENABLED=true before creating or using Home IDs."
+        )
+        return
 
     if st.session_state.get("home_login_error"):
         st.error(st.session_state["home_login_error"])
+
+    if st.session_state.get("home_login_message"):
+        st.info(st.session_state["home_login_message"])
+
+    tab1, tab2, tab3 = st.tabs(
+        [
+            "Create Random ID",
+            "Choose Custom ID",
+            "Log In Existing ID",
+        ]
+    )
+
+    with tab1:
+        st.write("Create a random anonymous Home ID.")
+
+        if st.button(
+            "Create Random Home ID",
+            key=f"{key_prefix}_create_random_home_id",
+            type="primary",
+        ):
+            try:
+                created_home_id = create_random_available_home_id()
+                st.success(f"Created Home ID: {created_home_id}")
+                st.warning("Copy this Home ID now. You need it later to view saved checks.")
+                st.rerun()
+
+            except Exception as error:
+                st.error("Could not create a random Home ID.")
+
+                with st.expander("Technical details"):
+                    st.code(str(error))
+
+    with tab2:
+        st.write("Choose your own anonymous Home ID.")
+
+        st.caption(
+            "Format: HOME-ABCD-1234-WXYZ. Use letters and numbers only. "
+            "Do not include names, addresses, or personal information."
+        )
+
+        custom_home_id = st.text_input(
+            "Choose a Home ID",
+            placeholder="HOME-SAFE-2026-DEMO",
+            key=f"{key_prefix}_custom_home_id",
+        )
+
+        if st.button(
+            "Check Availability",
+            key=f"{key_prefix}_check_custom_home_id",
+        ):
+            check_home_id_availability_for_ui(custom_home_id)
+
+        if st.button(
+            "Create This Home ID",
+            key=f"{key_prefix}_create_custom_home_id",
+            type="primary",
+        ):
+            created = create_custom_home_id(custom_home_id)
+
+            if created:
+                st.success(f"Created Home ID: {st.session_state['home_id']}")
+                st.warning("Copy this Home ID now. You need it later to view saved checks.")
+                st.rerun()
+
+    with tab3:
+        st.write("Log in with an existing Home ID.")
+
+        existing_home_id = st.text_input(
+            "Enter existing Home ID",
+            placeholder="HOME-8K2M-Q9PA-W4ZT",
+            key=f"{key_prefix}_existing_home_id",
+        )
+
+        if st.button(
+            "Log In with Home ID",
+            key=f"{key_prefix}_login_existing_home_id",
+            type="primary",
+        ):
+            logged_in = log_in_with_home_id(existing_home_id)
+
+            if logged_in:
+                st.success("Home ID login successful.")
+                st.rerun()
 
 def show_saved_result_id_box(saved_id):
     """
@@ -1476,6 +1698,9 @@ def show_landing_page():
     if st.button("Access Saved Checks by Home ID"):
         go_to_page("saved_results")
     st.caption(
+        "Use this if you already created a Home ID and want to view saved anonymous checks."
+    )    
+    st.caption(
         "Version 1 uses staged, non-patient photos only. "
         "No login. No database. No stored photos."
     )
@@ -1693,7 +1918,7 @@ def show_database_save_panel():
 
         show_home_id_login_box()
         return
-
+    show_home_id_status(key_suffix="save_panel")
     show_home_id_status()
     score = st.session_state.get("score")
     risk_level = st.session_state.get("risk_level")
@@ -1798,7 +2023,7 @@ def show_saved_results_page():
     show_home_id_status()
 
     if not get_logged_in_home_id():
-        show_home_id_login_box()
+        show_home_id_login_box(key_prefix="saved_page_home_id")
 
         if st.button("← Back to Landing Page"):
             go_to_page("landing")

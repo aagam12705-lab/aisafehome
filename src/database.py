@@ -616,6 +616,7 @@ def save_room_check(
         safety_confirmed=safety_confirmed,
         using_demo_sample=using_demo_sample,
         demo_sample_name=demo_sample_name,
+        room_id=room_id,
     )
 
     room_response = client.table("room_checks").insert(room_check_payload).execute()
@@ -679,12 +680,17 @@ def fetch_room_check_by_id(
 
     normalized_home_id = validate_home_id_or_raise(home_id)
 
+    cleaned_check_id = str(check_id).strip()
+
+    if not cleaned_check_id:
+        raise RuntimeError("Check ID is required.")
+
     client = get_supabase_client()
 
     response = (
         client.table("room_checks")
         .select("*")
-        .eq("id", str(check_id).strip())
+        .eq("id", cleaned_check_id)
         .eq("home_id", normalized_home_id)
         .limit(1)
         .execute()
