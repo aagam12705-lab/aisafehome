@@ -133,6 +133,54 @@ def is_valid_home_id(home_id: str | None) -> bool:
 
     return re.match(pattern, normalized) is not None
 
+def normalize_room_id(room_id: str | None) -> str:
+    """
+    Cleans a Room ID.
+
+    Examples:
+    bedroom1 -> BEDROOM1
+    Bedroom 1 -> BEDROOM-1
+    bathroom-2 -> BATHROOM-2
+    """
+
+    if not room_id:
+        return ""
+
+    cleaned = str(room_id).strip().upper()
+    cleaned = cleaned.replace(" ", "-")
+    cleaned = cleaned.replace("_", "-")
+
+    cleaned = re.sub(r"[^A-Z0-9-]", "", cleaned)
+    cleaned = re.sub(r"-+", "-", cleaned)
+
+    return cleaned
+
+
+def is_valid_room_id(room_id: str | None) -> bool:
+    """
+    Checks whether a Room ID is safe to store.
+    """
+
+    normalized = normalize_room_id(room_id)
+
+    pattern = r"^[A-Z0-9-]{2,40}$"
+
+    return re.match(pattern, normalized) is not None
+
+
+def validate_room_id_or_raise(room_id: str | None) -> str:
+    """
+    Returns a normalized Room ID or raises a clear error.
+    """
+
+    normalized = normalize_room_id(room_id)
+
+    if not is_valid_room_id(normalized):
+        raise RuntimeError(
+            "Invalid Room ID. Use something like BEDROOM-1, BEDROOM-2, or BATHROOM-1."
+        )
+
+    return normalized
 
 def validate_home_id_or_raise(home_id: str | None) -> str:
     """
@@ -168,6 +216,186 @@ def get_supabase_client() -> Client:
 
     return create_client(supabase_url, supabase_key)
 
+def home_id_exists(home_id: str) -> bool:
+    """
+    Checks whether a Home ID already exists in the database.
+    """
+
+    if not is_database_enabled():
+        return False
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+
+    client = get_supabase_client()
+
+    response = (
+        client.table("homes")
+        .select("home_id")
+        .eq("home_id", normalized_home_id)
+        .limit(1)
+        .execute()
+    )
+
+    return bool(response.data)
+
+
+def is_home_id_available(home_id: str) -> bool:
+    """
+    Returns True if the Home ID is valid and not already taken.
+    """
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+
+    return not home_id_exists(normalized_home_id)
+
+
+def create_home_id(home_id: str) -> str:
+    """
+    Creates/reserves a new anonymous Home ID.
+    """
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+
+    if home_id_exists(normalized_home_id):
+        raise RuntimeError("That Home ID is already taken.")
+
+    client = get_supabase_client()
+
+    response = (
+        client.table("homes")
+        .insert({"home_id": normalized_home_id})
+        .execute()
+    )
+
+    if not response.data:
+        raise RuntimeError("Could not create Home ID.")
+
+    return response.data[0]["home_id"]
+
+def fetch_rooms_for_home(
+    home_id: str,
+    room_type: str | None = None,
+) -> list[dict]:
+    """
+    Fetches rooms saved under one Home ID.
+
+    If room_type is provided, only returns rooms of that type.
+    Example: all Bedroom rooms under one Home ID.
+    """
+
+    if not is_database_enabled():
+        return []
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+
+    client = get_supabase_client()
+
+    query = (
+        client.table("home_rooms")
+        .select("*")
+        .eq("home_id", normalized_home_id)
+        .order("created_at", desc=False)
+    )
+
+    if room_type:
+        query = query.eq("room_type", room_type)
+
+    response = query.execute()
+
+    return response.data or []
+
+
+def room_id_exists(home_id: str, room_id: str) -> bool:
+    """
+    Checks whether a Room ID already exists under one Home ID.
+    """
+
+    if not is_database_enabled():
+        return False
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    normalized_room_id = validate_room_id_or_raise(room_id)
+
+    client = get_supabase_client()
+
+    response = (
+        client.table("home_rooms")
+        .select("id")
+        .eq("home_id", normalized_home_id)
+        .eq("room_id", normalized_room_id)
+        .limit(1)
+        .execute()
+    )
+
+    return bool(response.data)
+
+
+def create_home_room(
+    home_id: str,
+    room_id: str,
+    room_type: str,
+    room_display_name: str | None = None,
+) -> dict:
+    """
+    Creates one room under a Home ID.
+
+    Example:
+    Home ID: HOME-8K2M-Q9PA-W4ZT
+    Room ID: BEDROOM-1
+    Room Type: Bedroom
+    """
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    normalized_room_id = validate_room_id_or_raise(room_id)
+
+    if not home_id_exists(normalized_home_id):
+        raise RuntimeError("Home ID does not exist yet.")
+
+    if room_id_exists(normalized_home_id, normalized_room_id):
+        raise RuntimeError("That Room ID already exists under this Home ID.")
+
+    client = get_supabase_client()
+
+    payload = {
+        "home_id": normalized_home_id,
+        "room_id": normalized_room_id,
+        "room_type": room_type,
+        "room_display_name": room_display_name or normalized_room_id,
+    }
+
+    response = client.table("home_rooms").insert(payload).execute()
+
+    if not response.data:
+        raise RuntimeError("Could not create room.")
+
+    return response.data[0]
+
+
+def get_next_room_id(home_id: str, room_type: str) -> str:
+    """
+    Suggests the next Room ID for a selected room type.
+
+    Example:
+    Bedroom with no existing rooms -> BEDROOM-1
+    Bedroom with BEDROOM-1 existing -> BEDROOM-2
+    """
+
+    existing_rooms = fetch_rooms_for_home(home_id=home_id, room_type=room_type)
+
+    base = normalize_room_id(room_type)
+
+    if not base:
+        base = "ROOM"
+
+    number = len(existing_rooms) + 1
+
+    while True:
+        candidate = f"{base}-{number}"
+
+        if not room_id_exists(home_id, candidate):
+            return candidate
+
+        number += 1
 
 def validate_anonymous_save_confirmation(confirmed: bool) -> tuple[bool, str]:
     """
@@ -221,6 +449,7 @@ def build_room_check_payload(
     safety_confirmed: bool,
     using_demo_sample: bool = False,
     demo_sample_name: Optional[str] = None,
+    room_id: Optional[str] = None,
 ) -> dict[str, Any]:
     """
     Creates the main row for the room_checks table.
@@ -232,6 +461,7 @@ def build_room_check_payload(
 
     return {
         "home_id": validate_home_id_or_raise(home_id),
+        "room_id": validate_room_id_or_raise(room_id) if room_id else None,
         "app_version": get_app_version(),
         "ai_mode": get_ai_mode(),
         "room_type": room_type,
