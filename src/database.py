@@ -448,20 +448,20 @@ def build_room_check_payload(
     checklist_was_skipped: bool,
     safety_confirmed: bool,
     using_demo_sample: bool = False,
-    demo_sample_name: Optional[str] = None,
-    room_id: Optional[str] = None,
+    demo_sample_name: str | None = None,
+    room_id: str | None = None,
 ) -> dict[str, Any]:
     """
     Creates the main row for the room_checks table.
 
     This payload must stay anonymous.
+    It must not include photos or personal/medical information.
     """
 
     checklist_counts = count_checklist_answers(checklist_answers)
 
-    return {
+    payload = {
         "home_id": validate_home_id_or_raise(home_id),
-        "room_id": validate_room_id_or_raise(room_id) if room_id else None,
         "app_version": get_app_version(),
         "ai_mode": get_ai_mode(),
         "room_type": room_type,
@@ -477,7 +477,12 @@ def build_room_check_payload(
         "safety_confirmed": bool(safety_confirmed),
     }
 
+    if room_id:
+        payload["room_id"] = validate_room_id_or_raise(room_id)
+    else:
+        payload["room_id"] = None
 
+    return payload
 def build_hazard_detail_row(
     room_check_id: str,
     hazard: dict[str, Any],
@@ -584,16 +589,29 @@ def save_room_check(
     risk_level: str,
     hazards: list[dict[str, Any]],
     checklist_answers: list[dict[str, Any]],
-    recommended_fixes: list[Union[dict[str, Any], str]],
+    recommended_fixes: list[dict[str, Any] | str],
     checklist_was_skipped: bool,
     safety_confirmed: bool,
     using_demo_sample: bool = False,
-    demo_sample_name: Optional[str] = None,
+    demo_sample_name: str | None = None,
+    room_id: str | None = None,
 ) -> str:
     """
     Saves one anonymous room check and its details.
 
     Returns the saved room_check id.
+
+    This function must not save:
+    - uploaded photos
+    - names
+    - addresses
+    - ages
+    - medical history
+    - medications
+    - faces
+    - mail
+    - bills
+    - medical documents
     """
 
     confirmed_ok, error_message = validate_anonymous_save_confirmation(
@@ -603,10 +621,12 @@ def save_room_check(
     if not confirmed_ok:
         raise RuntimeError(error_message)
 
+    normalized_home_id = validate_home_id_or_raise(home_id)
+
     client = get_supabase_client()
 
     room_check_payload = build_room_check_payload(
-        home_id=home_id,
+        home_id=normalized_home_id,
         room_type=room_type,
         score=score,
         risk_level=risk_level,

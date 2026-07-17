@@ -1891,38 +1891,39 @@ def show_ai_results_page():
 
 def show_database_save_panel():
     """
-    Shows database tools after a score has been calculated.
+    Shows the database save panel after a score has been calculated.
 
     Saves anonymous room-check results only.
     Does not save uploaded photos or personal information.
 
-    Important fix:
-    The dashboard button is outside the save-button block and before early returns,
-    so it is always reachable.
+    Important:
+    Creating/logging in with a Home ID must not delete the current score/report.
     """
 
-    st.subheader("Database Tools")
-    st.caption(get_database_status_message())
-
-    if st.button(
-        "View Saved Checks by Home ID",
-        key="view_saved_results_dashboard_from_database_panel",
-    ):
-        go_to_page("saved_results")
-
-    st.divider()
     st.subheader("Save Anonymous Result")
+
     if st.session_state.get("report_text"):
         st.caption("Creating or logging in with a Home ID will not delete this report.")
     elif st.session_state.get("score") is not None:
         st.caption("Creating or logging in with a Home ID will not delete this score.")
+
+    st.caption(get_database_status_message())
+
     if not is_database_enabled():
         st.info(
             "Database saving is currently disabled. "
-            "The dashboard can still open, but it will not load saved rows until "
-            "DATABASE_ENABLED=true."
+            "The app still works normally without saving results."
         )
         return
+
+    score = st.session_state.get("score")
+    risk_level = st.session_state.get("risk_level")
+    room_type = st.session_state.get("room_type")
+
+    if score is None or risk_level is None or not room_type:
+        st.warning("Calculate a risk score before saving a result.")
+        return
+
     home_id = get_logged_in_home_id()
 
     if not home_id:
@@ -1933,6 +1934,7 @@ def show_database_save_panel():
 
         show_home_id_login_box(key_prefix="save_panel_home_id")
 
+        # Re-check after the login/create box runs.
         home_id = get_logged_in_home_id()
 
         if not home_id:
@@ -1941,14 +1943,6 @@ def show_database_save_panel():
         st.success("Home ID is ready. Your current result was preserved.")
 
     show_home_id_status(key_suffix="save_panel")
-    show_home_id_status()
-    score = st.session_state.get("score")
-    risk_level = st.session_state.get("risk_level")
-    room_type = st.session_state.get("room_type")
-
-    if score is None or risk_level is None or not room_type:
-        st.warning("Calculate a risk score before saving a result.")
-        return
 
     if st.session_state.get("database_save_complete"):
         st.success(
@@ -1959,11 +1953,7 @@ def show_database_save_panel():
         saved_id = st.session_state.get("database_save_id")
 
         if saved_id:
-            st.caption("Saved result ID:")
-            show_saved_result_id_box(saved_id)
-
-        if st.button("Look Up This Saved Result"):
-            go_to_page("lookup_saved_result")
+            st.caption(f"Saved result ID: {saved_id}")
 
         return
 
@@ -1973,7 +1963,7 @@ def show_database_save_panel():
         "mail, bills, medication bottles, medical documents, or medical history. "
         "Uploaded photos are not stored."
     )
-    show_database_privacy_notice()
+
     safety_confirmed = st.checkbox(
         "I confirm this result contains no personal, medical, or real patient information.",
         key="database_safety_confirmed",
@@ -2000,8 +1990,9 @@ def show_database_save_panel():
                 recommended_fixes=payload["recommended_fixes"],
                 checklist_was_skipped=payload["checklist_was_skipped"],
                 safety_confirmed=safety_confirmed,
-                using_demo_sample=payload["using_demo_sample"],
-                demo_sample_name=payload["demo_sample_name"],
+                using_demo_sample=payload.get("using_demo_sample", False),
+                demo_sample_name=payload.get("demo_sample_name"),
+                room_id=st.session_state.get("room_id"),
             )
 
             st.session_state["database_save_complete"] = True
@@ -2018,9 +2009,14 @@ def show_database_save_panel():
                 "The app still works, but this check was not stored."
             )
 
-            with st.expander("Technical details"):
-                st.code(str(error))
+            st.exception(error)
 
+            with st.expander("Technical details"):
+                st.code(repr(error))
+
+    if st.button("View Saved Checks by Home ID"):
+        go_to_page("saved_results")
+        
 def show_saved_results_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Saved Checks by Home ID")
