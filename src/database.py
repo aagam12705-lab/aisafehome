@@ -1,205 +1,70 @@
-"""
-database.py
-
-Privacy-safe Supabase database access for AI SafeHome.
-
-This file stores anonymous room-check results only.
-
-Never store:
-- uploaded photos
-- base64 image data
-- names
-- addresses
-- ages
-- medical history
-- medications
-- insurance information
-- patient IDs
-- real patient photos
-- faces
-- mail
-- bills
-- medication bottles
-- medical documents
-"""
-
 import os
 import re
-from typing import Any, Optional, Union
-from uuid import UUID
-from dotenv import load_dotenv
-from supabase import Client, create_client
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+from dotenv import load_dotenv
 
 load_dotenv()
 
 
 def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
     """
-    Reads a setting from environment variables.
-
-    Later, Streamlit Cloud secrets can also provide these values as environment
-    variables, so this function keeps the database layer simple.
+    Reads a setting from environment variables first.
+    If running inside Streamlit, also checks st.secrets.
     """
 
     value = os.getenv(name)
 
-    if value is None or value == "":
-        return default
+    if value is not None and value != "":
+        return value
 
-    return value
+    try:
+        import streamlit as st
+
+        if name in st.secrets:
+            secret_value = st.secrets[name]
+            if secret_value is not None and secret_value != "":
+                return str(secret_value)
+    except Exception:
+        pass
+
+    return default
 
 
 def is_database_enabled() -> bool:
-    """
-    Checks whether database saving is enabled.
-
-    The app should work normally when this returns False.
-    """
+    """Returns True when database saving/viewing is enabled."""
 
     value = get_env_value("DATABASE_ENABLED", "false")
     return str(value).lower().strip() == "true"
 
 
 def get_database_status_message() -> str:
-    """
-    Returns a safe database status message.
-
-    This must never expose keys, URLs, or secret values.
-    """
+    """Returns a safe status message. Never exposes secrets."""
 
     if is_database_enabled():
         return "Database saving is enabled."
-
     return "Database saving is disabled."
 
-def is_valid_uuid(value: str) -> bool:
-    """
-    Checks whether a value is a valid UUID string.
-
-    Supabase room_checks IDs are UUIDs.
-    """
-
-    try:
-        UUID(str(value))
-        return True
-    except ValueError:
-        return False
 
 def get_ai_mode() -> str:
-    """
-    Returns the current AI mode in a database-safe format.
-    """
+    """Returns the AI mode in a database-safe format."""
 
     mode = str(get_env_value("AI_ANALYSIS_MODE", "fake")).lower().strip()
-
     if mode in ["fake", "real", "demo"]:
         return mode
-
     return "unknown"
 
 
 def get_app_version() -> str:
-    """
-    Returns the app version saved with database rows.
-    """
+    """Returns the app version stored with saved rows."""
 
     return str(get_env_value("APP_VERSION", "1.0")).strip()
 
-def normalize_home_id(home_id: str | None) -> str:
-    """
-    Cleans a Home ID for lookup and saving.
 
-    Home IDs are anonymous access codes, not personal identifiers.
-    """
-
-    if not home_id:
-        return ""
-
-    return str(home_id).strip().upper()
-
-
-def is_valid_home_id(home_id: str | None) -> bool:
-    """
-    Checks whether a Home ID has a safe format.
-
-    Example:
-    HOME-8K2M-Q9PA-W4ZT
-    """
-
-    normalized = normalize_home_id(home_id)
-
-    pattern = r"^HOME-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$"
-
-    return re.match(pattern, normalized) is not None
-
-def normalize_room_id(room_id: str | None) -> str:
-    """
-    Cleans a Room ID.
-
-    Examples:
-    bedroom1 -> BEDROOM1
-    Bedroom 1 -> BEDROOM-1
-    bathroom-2 -> BATHROOM-2
-    """
-
-    if not room_id:
-        return ""
-
-    cleaned = str(room_id).strip().upper()
-    cleaned = cleaned.replace(" ", "-")
-    cleaned = cleaned.replace("_", "-")
-
-    cleaned = re.sub(r"[^A-Z0-9-]", "", cleaned)
-    cleaned = re.sub(r"-+", "-", cleaned)
-
-    return cleaned
-
-
-def is_valid_room_id(room_id: str | None) -> bool:
-    """
-    Checks whether a Room ID is safe to store.
-    """
-
-    normalized = normalize_room_id(room_id)
-
-    pattern = r"^[A-Z0-9-]{2,40}$"
-
-    return re.match(pattern, normalized) is not None
-
-
-def validate_room_id_or_raise(room_id: str | None) -> str:
-    """
-    Returns a normalized Room ID or raises a clear error.
-    """
-
-    normalized = normalize_room_id(room_id)
-
-    if not is_valid_room_id(normalized):
-        raise RuntimeError(
-            "Invalid Room ID. Use something like BEDROOM-1, BEDROOM-2, or BATHROOM-1."
-        )
-
-    return normalized
-
-def validate_home_id_or_raise(home_id: str | None) -> str:
-    """
-    Returns a normalized Home ID or raises a clear error.
-    """
-
-    normalized = normalize_home_id(home_id)
-
-    if not is_valid_home_id(normalized):
-        raise RuntimeError(
-            "Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT."
-        )
-
-    return normalized
-def get_supabase_client() -> Client:
+def get_supabase_client():
     """
     Creates and returns a Supabase client.
-
-    Raises a clear error if database saving is disabled or credentials are missing.
+    Import is lazy so the app can still run with the database disabled.
     """
 
     if not is_database_enabled():
@@ -214,18 +79,58 @@ def get_supabase_client() -> Client:
     if not supabase_key:
         raise RuntimeError("Missing SUPABASE_SERVICE_ROLE_KEY.")
 
+    try:
+        from supabase import create_client
+    except Exception as error:
+        raise RuntimeError(
+            "The 'supabase' package is not installed. Add supabase to requirements.txt."
+        ) from error
+
     return create_client(supabase_url, supabase_key)
 
+
+# -----------------------------------------------------------------------------
+# Home ID helpers
+# -----------------------------------------------------------------------------
+
+
+def normalize_home_id(home_id: Optional[str]) -> str:
+    """Cleans a Home ID for lookup and saving."""
+
+    if not home_id:
+        return ""
+    return str(home_id).strip().upper()
+
+
+def is_valid_home_id(home_id: Optional[str]) -> bool:
+    """
+    Checks whether a Home ID has a safe anonymous format.
+    Example: HOME-8K2M-Q9PA-W4ZT
+    """
+
+    normalized = normalize_home_id(home_id)
+    pattern = r"^HOME-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$"
+    return re.match(pattern, normalized) is not None
+
+
+def validate_home_id_or_raise(home_id: Optional[str]) -> str:
+    """Returns normalized Home ID or raises a clear error."""
+
+    normalized = normalize_home_id(home_id)
+
+    if not is_valid_home_id(normalized):
+        raise RuntimeError("Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT.")
+
+    return normalized
+
+
 def home_id_exists(home_id: str) -> bool:
-    """
-    Checks whether a Home ID already exists in the database.
-    """
+    """Checks whether a Home ID exists in the homes table."""
 
     if not is_database_enabled():
         return False
 
     normalized_home_id = validate_home_id_or_raise(home_id)
-
     client = get_supabase_client()
 
     response = (
@@ -240,19 +145,17 @@ def home_id_exists(home_id: str) -> bool:
 
 
 def is_home_id_available(home_id: str) -> bool:
-    """
-    Returns True if the Home ID is valid and not already taken.
-    """
+    """Returns True if a Home ID is valid and not already taken."""
 
     normalized_home_id = validate_home_id_or_raise(home_id)
-
     return not home_id_exists(normalized_home_id)
 
 
 def create_home_id(home_id: str) -> str:
-    """
-    Creates/reserves a new anonymous Home ID.
-    """
+    """Creates/reserves a new anonymous Home ID."""
+
+    if not is_database_enabled():
+        raise RuntimeError("Database saving is disabled.")
 
     normalized_home_id = validate_home_id_or_raise(home_id)
 
@@ -260,34 +163,63 @@ def create_home_id(home_id: str) -> str:
         raise RuntimeError("That Home ID is already taken.")
 
     client = get_supabase_client()
-
-    response = (
-        client.table("homes")
-        .insert({"home_id": normalized_home_id})
-        .execute()
-    )
+    response = client.table("homes").insert({"home_id": normalized_home_id}).execute()
 
     if not response.data:
         raise RuntimeError("Could not create Home ID.")
 
     return response.data[0]["home_id"]
 
-def fetch_rooms_for_home(
-    home_id: str,
-    room_type: str | None = None,
-) -> list[dict]:
-    """
-    Fetches rooms saved under one Home ID.
 
-    If room_type is provided, only returns rooms of that type.
-    Example: all Bedroom rooms under one Home ID.
+# -----------------------------------------------------------------------------
+# Room ID helpers
+# -----------------------------------------------------------------------------
+
+
+def normalize_room_id(room_id: Optional[str]) -> str:
     """
+    Cleans a Room ID.
+    Examples: Bedroom 1 -> BEDROOM-1, bathroom_2 -> BATHROOM-2
+    """
+
+    if not room_id:
+        return ""
+
+    cleaned = str(room_id).strip().upper()
+    cleaned = cleaned.replace(" ", "-").replace("_", "-")
+    cleaned = re.sub(r"[^A-Z0-9-]", "", cleaned)
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
+    return cleaned
+
+
+def is_valid_room_id(room_id: Optional[str]) -> bool:
+    """Checks whether a Room ID is safe to store."""
+
+    normalized = normalize_room_id(room_id)
+    pattern = r"^[A-Z0-9-]{2,40}$"
+    return re.match(pattern, normalized) is not None
+
+
+def validate_room_id_or_raise(room_id: Optional[str]) -> str:
+    """Returns a normalized Room ID or raises a clear error."""
+
+    normalized = normalize_room_id(room_id)
+
+    if not is_valid_room_id(normalized):
+        raise RuntimeError(
+            "Invalid Room ID. Use something like BEDROOM-1, BEDROOM-2, or BATHROOM-1."
+        )
+
+    return normalized
+
+
+def fetch_rooms_for_home(home_id: str, room_type: Optional[str] = None) -> List[Dict[str, Any]]:
+    """Fetches rooms under one Home ID. Optionally filters by room type."""
 
     if not is_database_enabled():
         return []
 
     normalized_home_id = validate_home_id_or_raise(home_id)
-
     client = get_supabase_client()
 
     query = (
@@ -301,21 +233,17 @@ def fetch_rooms_for_home(
         query = query.eq("room_type", room_type)
 
     response = query.execute()
-
     return response.data or []
 
 
 def room_id_exists(home_id: str, room_id: str) -> bool:
-    """
-    Checks whether a Room ID already exists under one Home ID.
-    """
+    """Checks whether a Room ID already exists under one Home ID."""
 
     if not is_database_enabled():
         return False
 
     normalized_home_id = validate_home_id_or_raise(home_id)
     normalized_room_id = validate_room_id_or_raise(room_id)
-
     client = get_supabase_client()
 
     response = (
@@ -334,16 +262,9 @@ def create_home_room(
     home_id: str,
     room_id: str,
     room_type: str,
-    room_display_name: str | None = None,
-) -> dict:
-    """
-    Creates one room under a Home ID.
-
-    Example:
-    Home ID: HOME-8K2M-Q9PA-W4ZT
-    Room ID: BEDROOM-1
-    Room Type: Bedroom
-    """
+    room_display_name: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Creates one anonymous room under one Home ID."""
 
     normalized_home_id = validate_home_id_or_raise(home_id)
     normalized_room_id = validate_room_id_or_raise(room_id)
@@ -372,36 +293,27 @@ def create_home_room(
 
 
 def get_next_room_id(home_id: str, room_type: str) -> str:
-    """
-    Suggests the next Room ID for a selected room type.
-
-    Example:
-    Bedroom with no existing rooms -> BEDROOM-1
-    Bedroom with BEDROOM-1 existing -> BEDROOM-2
-    """
+    """Suggests the next Room ID for a selected room type."""
 
     existing_rooms = fetch_rooms_for_home(home_id=home_id, room_type=room_type)
-
-    base = normalize_room_id(room_type)
-
-    if not base:
-        base = "ROOM"
+    base = normalize_room_id(room_type) or "ROOM"
 
     number = len(existing_rooms) + 1
 
     while True:
         candidate = f"{base}-{number}"
-
         if not room_id_exists(home_id, candidate):
             return candidate
-
         number += 1
 
-def validate_anonymous_save_confirmation(confirmed: bool) -> tuple[bool, str]:
-    """
-    Checks whether the user confirmed that no personal, medical,
-    or real patient information is being saved.
-    """
+
+# -----------------------------------------------------------------------------
+# Save payload helpers
+# -----------------------------------------------------------------------------
+
+
+def validate_anonymous_save_confirmation(confirmed: bool) -> Tuple[bool, str]:
+    """Checks whether the user confirmed anonymous/privacy-safe saving."""
 
     if confirmed:
         return True, ""
@@ -412,10 +324,8 @@ def validate_anonymous_save_confirmation(confirmed: bool) -> tuple[bool, str]:
     )
 
 
-def count_checklist_answers(checklist_answers: list[dict[str, Any]]) -> dict[str, int]:
-    """
-    Counts checklist answer types.
-    """
+def count_checklist_answers(checklist_answers: List[Dict[str, Any]]) -> Dict[str, int]:
+    """Counts checklist answer types."""
 
     counts = {
         "yes": 0,
@@ -443,25 +353,21 @@ def build_room_check_payload(
     room_type: str,
     score: int,
     risk_level: str,
-    hazards: list[dict[str, Any]],
-    checklist_answers: list[dict[str, Any]],
+    hazards: List[Dict[str, Any]],
+    checklist_answers: List[Dict[str, Any]],
     checklist_was_skipped: bool,
     safety_confirmed: bool,
     using_demo_sample: bool = False,
-    demo_sample_name: str | None = None,
-    room_id: str | None = None,
-) -> dict[str, Any]:
-    """
-    Creates the main row for the room_checks table.
-
-    This payload must stay anonymous.
-    It must not include photos or personal/medical information.
-    """
+    demo_sample_name: Optional[str] = None,
+    room_id: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Creates the main row for room_checks. This payload must stay anonymous."""
 
     checklist_counts = count_checklist_answers(checklist_answers)
 
-    payload = {
+    return {
         "home_id": validate_home_id_or_raise(home_id),
+        "room_id": validate_room_id_or_raise(room_id) if room_id else None,
         "app_version": get_app_version(),
         "ai_mode": get_ai_mode(),
         "room_type": room_type,
@@ -477,19 +383,9 @@ def build_room_check_payload(
         "safety_confirmed": bool(safety_confirmed),
     }
 
-    if room_id:
-        payload["room_id"] = validate_room_id_or_raise(room_id)
-    else:
-        payload["room_id"] = None
 
-    return payload
-def build_hazard_detail_row(
-    room_check_id: str,
-    hazard: dict[str, Any],
-) -> dict[str, Any]:
-    """
-    Creates one ai_hazard row for room_check_details.
-    """
+def build_hazard_detail_row(room_check_id: str, hazard: Dict[str, Any]) -> Dict[str, Any]:
+    """Creates one ai_hazard row for room_check_details."""
 
     return {
         "room_check_id": room_check_id,
@@ -504,13 +400,8 @@ def build_hazard_detail_row(
     }
 
 
-def build_checklist_detail_row(
-    room_check_id: str,
-    answer: dict[str, Any],
-) -> dict[str, Any]:
-    """
-    Creates one checklist_answer row for room_check_details.
-    """
+def build_checklist_detail_row(room_check_id: str, answer: Dict[str, Any]) -> Dict[str, Any]:
+    """Creates one checklist_answer row for room_check_details."""
 
     return {
         "room_check_id": room_check_id,
@@ -525,16 +416,8 @@ def build_checklist_detail_row(
     }
 
 
-def build_fix_detail_row(
-    room_check_id: str,
-    fix: Union[dict[str, Any], str],
-) -> dict[str, Any]:
-    """
-    Creates one recommended_fix row for room_check_details.
-
-    Supports both the old string format and the newer dictionary format from
-    the priority-label milestone.
-    """
+def build_fix_detail_row(room_check_id: str, fix: Union[Dict[str, Any], str]) -> Dict[str, Any]:
+    """Creates one recommended_fix row for room_check_details."""
 
     if isinstance(fix, dict):
         recommendation = fix.get("text")
@@ -560,13 +443,11 @@ def build_fix_detail_row(
 
 def build_detail_rows(
     room_check_id: str,
-    hazards: list[dict[str, Any]],
-    checklist_answers: list[dict[str, Any]],
-    recommended_fixes: list[Union[dict[str, Any], str]],
-) -> list[dict[str, Any]]:
-    """
-    Creates all room_check_details rows for one saved room check.
-    """
+    hazards: List[Dict[str, Any]],
+    checklist_answers: List[Dict[str, Any]],
+    recommended_fixes: List[Union[Dict[str, Any], str]],
+) -> List[Dict[str, Any]]:
+    """Creates all room_check_details rows for one saved room check."""
 
     detail_rows = []
 
@@ -587,46 +468,25 @@ def save_room_check(
     room_type: str,
     score: int,
     risk_level: str,
-    hazards: list[dict[str, Any]],
-    checklist_answers: list[dict[str, Any]],
-    recommended_fixes: list[dict[str, Any] | str],
+    hazards: List[Dict[str, Any]],
+    checklist_answers: List[Dict[str, Any]],
+    recommended_fixes: List[Union[Dict[str, Any], str]],
     checklist_was_skipped: bool,
     safety_confirmed: bool,
     using_demo_sample: bool = False,
-    demo_sample_name: str | None = None,
-    room_id: str | None = None,
+    demo_sample_name: Optional[str] = None,
+    room_id: Optional[str] = None,
 ) -> str:
-    """
-    Saves one anonymous room check and its details.
+    """Saves one anonymous room check and its details. Returns saved check ID."""
 
-    Returns the saved room_check id.
-
-    This function must not save:
-    - uploaded photos
-    - names
-    - addresses
-    - ages
-    - medical history
-    - medications
-    - faces
-    - mail
-    - bills
-    - medical documents
-    """
-
-    confirmed_ok, error_message = validate_anonymous_save_confirmation(
-        safety_confirmed
-    )
-
+    confirmed_ok, error_message = validate_anonymous_save_confirmation(safety_confirmed)
     if not confirmed_ok:
         raise RuntimeError(error_message)
-
-    normalized_home_id = validate_home_id_or_raise(home_id)
 
     client = get_supabase_client()
 
     room_check_payload = build_room_check_payload(
-        home_id=normalized_home_id,
+        home_id=home_id,
         room_type=room_type,
         score=score,
         risk_level=risk_level,
@@ -658,19 +518,19 @@ def save_room_check(
 
     return room_check_id
 
-def fetch_room_checks_by_home_id(
-    home_id: str,
-    limit: int = 50,
-) -> list[dict[str, Any]]:
-    """
-    Fetches saved room checks for one Home ID only.
-    """
+
+# -----------------------------------------------------------------------------
+# Fetch checks and details
+# -----------------------------------------------------------------------------
+
+
+def fetch_room_checks_by_home_id(home_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+    """Fetches saved checks for one Home ID only."""
 
     if not is_database_enabled():
         return []
 
     normalized_home_id = validate_home_id_or_raise(home_id)
-
     client = get_supabase_client()
 
     response = (
@@ -685,32 +545,42 @@ def fetch_room_checks_by_home_id(
     return response.data or []
 
 
-def fetch_room_check_by_id(
-    check_id: str,
-    home_id: str,
-) -> dict[str, Any] | None:
-    """
-    Fetches one room check by Check ID and Home ID.
-
-    Requiring both IDs prevents random Check ID lookup across homes.
-    """
+def fetch_room_checks_by_room_id(home_id: str, room_id: str, limit: int = 100) -> List[Dict[str, Any]]:
+    """Fetches saved checks for one Home ID and one Room ID."""
 
     if not is_database_enabled():
-        return None
+        return []
 
     normalized_home_id = validate_home_id_or_raise(home_id)
-
-    cleaned_check_id = str(check_id).strip()
-
-    if not cleaned_check_id:
-        raise RuntimeError("Check ID is required.")
-
+    normalized_room_id = validate_room_id_or_raise(room_id)
     client = get_supabase_client()
 
     response = (
         client.table("room_checks")
         .select("*")
-        .eq("id", cleaned_check_id)
+        .eq("home_id", normalized_home_id)
+        .eq("room_id", normalized_room_id)
+        .order("created_at", desc=True)
+        .limit(limit)
+        .execute()
+    )
+
+    return response.data or []
+
+
+def fetch_room_check_by_id(check_id: str, home_id: str) -> Optional[Dict[str, Any]]:
+    """Fetches one saved room check by Check ID and Home ID."""
+
+    if not is_database_enabled():
+        return None
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    client = get_supabase_client()
+
+    response = (
+        client.table("room_checks")
+        .select("*")
+        .eq("id", str(check_id).strip())
         .eq("home_id", normalized_home_id)
         .limit(1)
         .execute()
@@ -722,10 +592,8 @@ def fetch_room_check_by_id(
     return response.data[0]
 
 
-def fetch_room_check_details(room_check_id: str) -> list[dict[str, Any]]:
-    """
-    Fetches detail rows for one saved room check.
-    """
+def fetch_room_check_details(room_check_id: str) -> List[Dict[str, Any]]:
+    """Fetches detail rows for one saved room check."""
 
     if not is_database_enabled():
         return []
@@ -743,10 +611,22 @@ def fetch_room_check_details(room_check_id: str) -> list[dict[str, Any]]:
     return response.data or []
 
 
-def fetch_summary_stats_for_home(home_id: str) -> dict[str, Any]:
-    """
-    Returns summary stats for one Home ID only.
-    """
+def fetch_room_details_for_checks(room_check_ids: List[str]) -> List[Dict[str, Any]]:
+    """Fetches detail rows for multiple saved room checks."""
+
+    detail_rows = []
+    for room_check_id in room_check_ids:
+        detail_rows.extend(fetch_room_check_details(room_check_id))
+    return detail_rows
+
+
+# -----------------------------------------------------------------------------
+# Stats
+# -----------------------------------------------------------------------------
+
+
+def fetch_summary_stats_for_home(home_id: str) -> Dict[str, Any]:
+    """Returns summary stats for one Home ID only."""
 
     rows = fetch_room_checks_by_home_id(home_id=home_id, limit=500)
 
@@ -765,13 +645,10 @@ def fetch_summary_stats_for_home(home_id: str) -> dict[str, Any]:
     average_score = round(sum(scores) / len(scores))
 
     high_risk_count = sum(1 for row in rows if row.get("risk_level") == "High Risk")
-    moderate_risk_count = sum(
-        1 for row in rows if row.get("risk_level") == "Moderate Risk"
-    )
+    moderate_risk_count = sum(1 for row in rows if row.get("risk_level") == "Moderate Risk")
     low_risk_count = sum(1 for row in rows if row.get("risk_level") == "Low Risk")
 
     room_counts = {}
-
     for row in rows:
         room_type = row.get("room_type", "Unknown")
         room_counts[room_type] = room_counts.get(room_type, 0) + 1
@@ -787,158 +664,157 @@ def fetch_summary_stats_for_home(home_id: str) -> dict[str, Any]:
         "low_risk_count": low_risk_count,
         "most_common_room": most_common_room,
     }
-def fetch_recent_room_checks(limit: int = 20) -> list[dict[str, Any]]:
-    """
-    Fetches recent saved room checks.
-
-    Used later for a simple saved-results dashboard.
-    """
-
-    if not is_database_enabled():
-        return []
-
-    client = get_supabase_client()
-
-    response = (
-        client.table("room_checks")
-        .select("*")
-        .order("created_at", desc=True)
-        .limit(limit)
-        .execute()
-    )
-
-    return response.data or []
-
-def fetch_room_check_by_id(room_check_id: str) -> dict[str, Any] | None:
-    """
-    Fetches one anonymous room check by ID.
-
-    Returns None if no matching row exists.
-    """
-
-    if not is_database_enabled():
-        return None
-
-    if not is_valid_uuid(room_check_id):
-        raise ValueError("Invalid saved result ID. Expected a UUID.")
-
-    client = get_supabase_client()
-
-    response = (
-        client.table("room_checks")
-        .select("*")
-        .eq("id", room_check_id)
-        .maybe_single()
-        .execute()
-    )
-
-    return response.data
 
 
-def fetch_room_check_details_by_id(room_check_id: str) -> list[dict[str, Any]]:
-    """
-    Fetches detail rows for one saved room check.
-    """
+def build_room_stats_record(
+    room_info: Dict[str, Any],
+    check_rows: List[Dict[str, Any]],
+    detail_rows: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    """Builds one room stats record from room info, saved checks, and details."""
 
-    if not is_database_enabled():
-        return []
+    room_id = room_info.get("room_id")
+    room_type = room_info.get("room_type", "Unknown Room")
+    room_display_name = room_info.get("room_display_name") or room_id
+    check_count = len(check_rows)
 
-    if not is_valid_uuid(room_check_id):
-        raise ValueError("Invalid saved result ID. Expected a UUID.")
-
-    client = get_supabase_client()
-
-    response = (
-        client.table("room_check_details")
-        .select("*")
-        .eq("room_check_id", room_check_id)
-        .order("created_at", desc=False)
-        .execute()
-    )
-
-    return response.data or []
-
-
-def fetch_room_check_with_details(room_check_id: str) -> dict[str, Any] | None:
-    """
-    Fetches one saved room check plus its hazards, checklist answers, and fixes.
-    """
-
-    room_check = fetch_room_check_by_id(room_check_id)
-
-    if not room_check:
-        return None
-
-    details = fetch_room_check_details_by_id(room_check_id)
-
-    return {
-        "room_check": room_check,
-        "details": details,
-    }
-def fetch_summary_stats() -> dict[str, Any]:
-    """
-    Fetches simple summary stats for saved anonymous room checks.
-
-    This keeps the logic beginner-friendly by calculating stats in Python.
-    """
-
-    if not is_database_enabled():
+    if check_count == 0:
         return {
-            "database_enabled": False,
-            "total_checks": 0,
+            "room_id": room_id,
+            "room_type": room_type,
+            "room_display_name": room_display_name,
+            "check_count": 0,
             "average_score": 0,
-            "high_risk_count": 0,
-            "moderate_risk_count": 0,
+            "latest_score": None,
+            "highest_score": None,
+            "lowest_score": None,
+            "latest_risk_level": None,
+            "latest_created_at": None,
             "low_risk_count": 0,
-            "most_common_room": None,
+            "moderate_risk_count": 0,
+            "high_risk_count": 0,
+            "hazard_counts": {},
+            "top_hazard": None,
+            "checklist_answer_counts": {},
+            "recommended_fix_count": 0,
         }
 
-    client = get_supabase_client()
+    scores = [row.get("score", 0) for row in check_rows]
+    latest_check = check_rows[0]
 
-    response = (
-        client.table("room_checks")
-        .select("*")
-        .order("created_at", desc=True)
-        .limit(500)
-        .execute()
-    )
+    hazard_counts: Dict[str, int] = {}
+    checklist_answer_counts: Dict[str, int] = {}
+    recommended_fix_count = 0
 
-    rows = response.data or []
+    for detail in detail_rows:
+        detail_type = detail.get("detail_type")
 
-    if not rows:
-        return {
-            "database_enabled": True,
-            "total_checks": 0,
-            "average_score": 0,
-            "high_risk_count": 0,
-            "moderate_risk_count": 0,
-            "low_risk_count": 0,
-            "most_common_room": None,
-        }
+        if detail_type == "ai_hazard":
+            category = detail.get("category") or "unclear"
+            hazard_counts[category] = hazard_counts.get(category, 0) + 1
+        elif detail_type == "checklist_answer":
+            answer = detail.get("checklist_answer") or "Unknown"
+            checklist_answer_counts[answer] = checklist_answer_counts.get(answer, 0) + 1
+        elif detail_type == "recommended_fix":
+            recommended_fix_count += 1
 
-    scores = [row.get("score", 0) for row in rows]
-    average_score = round(sum(scores) / len(scores))
-
-    high_risk_count = sum(1 for row in rows if row.get("risk_level") == "High Risk")
-    moderate_risk_count = sum(
-        1 for row in rows if row.get("risk_level") == "Moderate Risk"
-    )
-    low_risk_count = sum(1 for row in rows if row.get("risk_level") == "Low Risk")
-
-    room_counts = {}
-
-    for row in rows:
-        room_type = row.get("room_type", "Unknown")
-        room_counts[room_type] = room_counts.get(room_type, 0) + 1
-
-    most_common_room = max(room_counts, key=room_counts.get)
+    top_hazard = max(hazard_counts, key=hazard_counts.get) if hazard_counts else None
 
     return {
-        "database_enabled": True,
-        "total_checks": len(rows),
-        "average_score": average_score,
-        "high_risk_count": high_risk_count,
-        "moderate_risk_count": moderate_risk_count,
-        "low_risk_count": low_risk_count,
-        "most_common_room": most_common_room,
+        "room_id": room_id,
+        "room_type": room_type,
+        "room_display_name": room_display_name,
+        "check_count": check_count,
+        "average_score": round(sum(scores) / check_count),
+        "latest_score": latest_check.get("score"),
+        "highest_score": max(scores),
+        "lowest_score": min(scores),
+        "latest_risk_level": latest_check.get("risk_level"),
+        "latest_created_at": latest_check.get("created_at"),
+        "low_risk_count": sum(1 for row in check_rows if row.get("risk_level") == "Low Risk"),
+        "moderate_risk_count": sum(1 for row in check_rows if row.get("risk_level") == "Moderate Risk"),
+        "high_risk_count": sum(1 for row in check_rows if row.get("risk_level") == "High Risk"),
+        "hazard_counts": hazard_counts,
+        "top_hazard": top_hazard,
+        "checklist_answer_counts": checklist_answer_counts,
+        "recommended_fix_count": recommended_fix_count,
     }
+
+
+def fetch_room_stats(home_id: str, room_id: str) -> Dict[str, Any]:
+    """Gets stats for one Room ID under one Home ID."""
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    normalized_room_id = validate_room_id_or_raise(room_id)
+
+    rooms = fetch_rooms_for_home(home_id=normalized_home_id)
+
+    matching_room = None
+    for room in rooms:
+        if room.get("room_id") == normalized_room_id:
+            matching_room = room
+            break
+
+    if matching_room is None:
+        matching_room = {
+            "room_id": normalized_room_id,
+            "room_type": "Unknown Room",
+            "room_display_name": normalized_room_id,
+        }
+
+    check_rows = fetch_room_checks_by_room_id(
+        home_id=normalized_home_id,
+        room_id=normalized_room_id,
+        limit=100,
+    )
+
+    check_ids = [row["id"] for row in check_rows if row.get("id")]
+    detail_rows = fetch_room_details_for_checks(check_ids)
+
+    return build_room_stats_record(
+        room_info=matching_room,
+        check_rows=check_rows,
+        detail_rows=detail_rows,
+    )
+
+
+def fetch_all_room_stats_for_home(home_id: str) -> List[Dict[str, Any]]:
+    """Gets stats for every room under one Home ID."""
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    rooms = fetch_rooms_for_home(home_id=normalized_home_id)
+    all_checks = fetch_room_checks_by_home_id(home_id=normalized_home_id, limit=500)
+
+    rooms_by_id: Dict[str, Dict[str, Any]] = {}
+
+    for room in rooms:
+        room_id = room.get("room_id")
+        if room_id:
+            rooms_by_id[room_id] = room
+
+    # Include rooms that have checks but may not exist in home_rooms because of older data.
+    for check in all_checks:
+        room_id = check.get("room_id")
+        if room_id and room_id not in rooms_by_id:
+            rooms_by_id[room_id] = {
+                "room_id": room_id,
+                "room_type": check.get("room_type", "Unknown Room"),
+                "room_display_name": room_id,
+            }
+
+    stats = []
+
+    for room_id, room_info in rooms_by_id.items():
+        check_rows = [row for row in all_checks if row.get("room_id") == room_id]
+        check_ids = [row["id"] for row in check_rows if row.get("id")]
+        detail_rows = fetch_room_details_for_checks(check_ids)
+
+        stats.append(
+            build_room_stats_record(
+                room_info=room_info,
+                check_rows=check_rows,
+                detail_rows=detail_rows,
+            )
+        )
+
+    return sorted(stats, key=lambda item: (item.get("room_type", ""), item.get("room_id", "")))
