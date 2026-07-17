@@ -1,4 +1,6 @@
 import html
+import secrets
+import string
 import streamlit as st
 from PIL import Image, ImageOps, UnidentifiedImageError
 from src.scoring import (
@@ -7,11 +9,13 @@ from src.scoring import (
     get_score_breakdown,
 )
 from src.database import (
-    fetch_recent_room_checks,
-    fetch_room_check_with_details,
-    fetch_summary_stats,
+    fetch_room_check_by_id,
+    fetch_room_check_details,
+    fetch_room_checks_by_home_id,
+    fetch_summary_stats_for_home,
     get_database_status_message,
     is_database_enabled,
+    is_valid_home_id,
     save_room_check,
 )
 from src.multi_room import build_home_summary, get_home_priority_label
@@ -188,12 +192,19 @@ def initialize_session_state():
         st.session_state["checklist_answers_by_id"] = {}
 
     if "checklist_was_skipped" not in st.session_state:
-        st.session_state["checklist_was_skipped"] = False   
+        st.session_state["checklist_was_skipped"] = False 
+
     if "database_save_complete" not in st.session_state:
         st.session_state["database_save_complete"] = False
 
     if "database_save_id" not in st.session_state:
         st.session_state["database_save_id"] = None
+
+    if "home_id" not in st.session_state:
+        st.session_state["home_id"] = None
+
+    if "home_login_error" not in st.session_state:
+        st.session_state["home_login_error"] = None
   
 
 
@@ -901,6 +912,114 @@ def group_saved_result_details(details):
 
     return grouped
 
+def generate_home_id():
+    """
+    Creates an anonymous Home ID.
+
+    This is not personal information.
+    Example: HOME-8K2M-Q9PA-W4ZT
+    """
+
+    alphabet = string.ascii_uppercase + string.digits
+
+    parts = []
+
+    for _ in range(3):
+        part = "".join(secrets.choice(alphabet) for _ in range(4))
+        parts.append(part)
+
+    return "HOME-" + "-".join(parts)
+
+
+def log_in_with_home_id(home_id):
+    """
+    Saves the Home ID in Streamlit session state.
+    """
+
+    cleaned_home_id = str(home_id).strip().upper()
+
+    if not is_valid_home_id(cleaned_home_id):
+        st.session_state["home_login_error"] = (
+            "Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT."
+        )
+        return False
+
+    st.session_state["home_id"] = cleaned_home_id
+    st.session_state["home_login_error"] = None
+    return True
+
+
+def log_out_home_id():
+    """
+    Clears the current Home ID from this browser session.
+    """
+
+    st.session_state["home_id"] = None
+    st.session_state["home_login_error"] = None
+
+
+def get_logged_in_home_id():
+    """
+    Returns the current Home ID, if logged in.
+    """
+
+    return st.session_state.get("home_id")
+
+
+def show_home_id_status():
+    """
+    Shows the current Home ID status.
+    """
+
+    home_id = get_logged_in_home_id()
+
+    if home_id:
+        st.success(f"Logged in with Home ID: {home_id}")
+
+        st.caption(
+            "Save this Home ID somewhere safe. Anyone with this code can view checks saved under it."
+        )
+
+        if st.button("Log Out of Home ID"):
+            log_out_home_id()
+            st.rerun()
+    else:
+        st.info("No Home ID is logged in yet.")
+
+
+def show_home_id_login_box():
+    """
+    Lets the user create or enter a Home ID.
+    """
+
+    st.subheader("Home ID Login")
+
+    st.write(
+        "Use a Home ID to save and view anonymous checks for one home/session. "
+        "Do not use a name, address, or personal information."
+    )
+
+    if st.button("Create New Home ID"):
+        new_home_id = generate_home_id()
+        st.session_state["home_id"] = new_home_id
+        st.session_state["home_login_error"] = None
+        st.success(f"New Home ID created: {new_home_id}")
+        st.warning("Copy this Home ID now. You need it later to view saved checks.")
+
+    entered_home_id = st.text_input(
+        "Enter existing Home ID",
+        placeholder="HOME-8K2M-Q9PA-W4ZT",
+    )
+
+    if st.button("Log In with Home ID"):
+        logged_in = log_in_with_home_id(entered_home_id)
+
+        if logged_in:
+            st.success("Home ID login successful.")
+            st.rerun()
+
+    if st.session_state.get("home_login_error"):
+        st.error(st.session_state["home_login_error"])
 
 def show_saved_result_id_box(saved_id):
     """
@@ -1350,11 +1469,12 @@ def show_landing_page():
         go_to_page("room_selection")
 
     if st.button(
-        "View Saved Results Dashboard",
+        "View Saved Checks by Home ID",
         key="view_saved_results_dashboard_from_landing",
     ):
         go_to_page("saved_results")
-
+    if st.button("Access Saved Checks by Home ID"):
+        go_to_page("saved_results")
     st.caption(
         "Version 1 uses staged, non-patient photos only. "
         "No login. No database. No stored photos."
@@ -1548,7 +1668,7 @@ def show_database_save_panel():
     st.caption(get_database_status_message())
 
     if st.button(
-        "View Saved Results Dashboard",
+        "View Saved Checks by Home ID",
         key="view_saved_results_dashboard_from_database_panel",
     ):
         go_to_page("saved_results")
@@ -1563,7 +1683,18 @@ def show_database_save_panel():
             "DATABASE_ENABLED=true."
         )
         return
+    home_id = get_logged_in_home_id()
 
+    if not home_id:
+        st.warning(
+            "Create or enter a Home ID before saving. "
+            "This keeps saved checks grouped by anonymous Home ID."
+        )
+
+        show_home_id_login_box()
+        return
+
+    show_home_id_status()
     score = st.session_state.get("score")
     risk_level = st.session_state.get("risk_level")
     room_type = st.session_state.get("room_type")
@@ -1613,6 +1744,7 @@ def show_database_save_panel():
 
         try:
             saved_id = save_room_check(
+                home_id=home_id,
                 room_type=payload["room_type"],
                 score=payload["score"],
                 risk_level=payload["risk_level"],
@@ -1644,19 +1776,18 @@ def show_database_save_panel():
 
 def show_saved_results_page():
     st.title("🏠 AI SafeHome")
-    st.subheader("Saved Results Dashboard")
+    st.subheader("Saved Checks by Home ID")
 
     st.caption(get_database_status_message())
 
     st.warning(
-        "This dashboard shows anonymous room-check results only. "
-        "Uploaded photos, names, addresses, medical history, medication lists, "
-        "faces, mail, bills, and medical documents should not be stored."
+        "This page shows anonymous checks only for the entered Home ID. "
+        "It does not show all recent database checks."
     )
-    show_database_privacy_notice()
+
     if not is_database_enabled():
         st.info(
-            "Database saving is disabled. Enable DATABASE_ENABLED=true to view saved results."
+            "Database saving is disabled. Enable DATABASE_ENABLED=true to view saved checks."
         )
 
         if st.button("← Back to Landing Page"):
@@ -1664,20 +1795,27 @@ def show_saved_results_page():
 
         return
 
-    try:
-        stats = fetch_summary_stats()
-        recent_rows = fetch_recent_room_checks(limit=25)
+    show_home_id_status()
 
-    except Exception as error:
-        st.error(
-            "Could not load saved results. Check your Supabase settings and database tables."
-        )
-
-        with st.expander("Technical details"):
-            st.code(str(error))
+    if not get_logged_in_home_id():
+        show_home_id_login_box()
 
         if st.button("← Back to Landing Page"):
             go_to_page("landing")
+
+        return
+
+    home_id = get_logged_in_home_id()
+
+    try:
+        stats = fetch_summary_stats_for_home(home_id)
+        rows = fetch_room_checks_by_home_id(home_id, limit=50)
+
+    except Exception as error:
+        st.error("Could not load checks for this Home ID.")
+
+        with st.expander("Technical details"):
+            st.code(str(error))
 
         return
 
@@ -1689,13 +1827,113 @@ def show_saved_results_page():
 
     st.divider()
 
-    st.subheader("Recent Anonymous Room Checks")
+    st.subheader("Checks Saved Under This Home ID")
 
-    show_recent_saved_room_checks(recent_rows)
+    if not rows:
+        st.info("No checks have been saved under this Home ID yet.")
+    else:
+        for index, row in enumerate(rows, start=1):
+            created_at = format_database_datetime(row.get("created_at"))
+            check_id = safe_text(row.get("id"))
+            room_type = safe_text(row.get("room_type", "Unknown Room"))
+            risk_level = safe_text(row.get("risk_level", "Unknown"))
+            ai_mode = safe_text(row.get("ai_mode", "unknown"))
+
+            score = row.get("score", 0)
+            hazard_count = row.get("hazard_count", 0)
+            checklist_was_skipped = row.get("checklist_was_skipped", False)
+
+            checklist_text = "Yes" if checklist_was_skipped else "No"
+
+            st.markdown(
+                f"""
+                <div class="plain-card">
+                    <strong>Check {index}</strong><br>
+                    Check ID: {check_id}<br>
+                    Room: {room_type}<br>
+                    Score: {score}/100<br>
+                    Risk Label: {risk_level}<br>
+                    AI Mode: {ai_mode}<br>
+                    Hazards Saved: {hazard_count}<br>
+                    Checklist Skipped: {checklist_text}<br>
+                    Saved At: {safe_text(created_at)}
+                </div>
+                """,
+                unsafe_allow_html=True,
+            )
 
     st.divider()
 
-    if st.button("Refresh Dashboard"):
+    st.subheader("Look Up One Check by Check ID")
+
+    check_id_input = st.text_input(
+        "Enter Check ID",
+        placeholder="Paste a saved room_check UUID here",
+    )
+
+    if st.button("Find Check by ID"):
+        if not check_id_input.strip():
+            st.error("Enter a Check ID first.")
+        else:
+            try:
+                check = fetch_room_check_by_id(
+                    check_id=check_id_input,
+                    home_id=home_id,
+                )
+
+                if not check:
+                    st.error(
+                        "No check found for that Check ID under this Home ID."
+                    )
+                else:
+                    details = fetch_room_check_details(check["id"])
+
+                    st.success("Check found.")
+
+                    st.markdown(
+                        f"""
+                        <div class="plain-card">
+                            <strong>Check ID:</strong> {safe_text(check.get("id"))}<br>
+                            Room: {safe_text(check.get("room_type"))}<br>
+                            Score: {check.get("score")}/100<br>
+                            Risk Label: {safe_text(check.get("risk_level"))}<br>
+                            Saved At: {safe_text(format_database_datetime(check.get("created_at")))}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+
+                    with st.expander("View check details"):
+                        if not details:
+                            st.write("No detail rows found.")
+                        else:
+                            for detail in details:
+                                detail_type = detail.get("detail_type")
+
+                                if detail_type == "ai_hazard":
+                                    st.write(
+                                        f"- Hazard: {detail.get('title')} "
+                                        f"({detail.get('category')})"
+                                    )
+                                elif detail_type == "checklist_answer":
+                                    st.write(
+                                        f"- Checklist: {detail.get('checklist_question')} "
+                                        f"→ {detail.get('checklist_answer')}"
+                                    )
+                                elif detail_type == "recommended_fix":
+                                    st.write(
+                                        f"- Fix: {detail.get('recommendation')}"
+                                    )
+
+            except Exception as error:
+                st.error("Could not look up that Check ID.")
+
+                with st.expander("Technical details"):
+                    st.code(str(error))
+
+    st.divider()
+
+    if st.button("Refresh"):
         st.rerun()
 
     if st.button("Start New Safety Check"):
@@ -1706,6 +1944,7 @@ def show_saved_results_page():
 
     if st.button("← Back to Landing Page"):
         go_to_page("landing")
+
 def show_checklist_page():
     st.title("🏠 AI SafeHome")
     st.subheader("Step 4: Safety Checklist")
@@ -2486,7 +2725,7 @@ def show_lookup_saved_result_page():
 
     st.divider()
 
-    if st.button("View Saved Results Dashboard"):
+    if st.button("View Saved Checks by Home ID"):
         go_to_page("saved_results")
 
     if st.button("Start New Safety Check"):

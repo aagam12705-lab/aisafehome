@@ -115,6 +115,16 @@ The database does not store:
 - Medication bottles
 - Medical documents
 
+## Home ID Access
+
+AI SafeHome does not show a public list of all recent saved checks.
+
+Saved checks are grouped by anonymous Home ID.
+
+A Home ID looks like:
+
+```text
+HOME-8K2M-Q9PA-W4ZT
 Database saving is controlled by:
 
 ```bash
