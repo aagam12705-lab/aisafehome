@@ -149,6 +149,7 @@ def initialize_session_state():
     if "room_type" not in st.session_state:
         st.session_state["room_type"] = None
         st.session_state["score_adjustment"] = None
+
     if "photo_uploaded" not in st.session_state:
         st.session_state["photo_uploaded"] = False
 
@@ -1134,8 +1135,9 @@ def show_home_id_login_box(key_prefix="home_id"):
     """
     Lets the user create a new Home ID or log in with an existing one.
 
-    A Home ID is an anonymous access code.
-    It must not include names, addresses, or personal information.
+    Important:
+    This function must NOT reset the current room check, score, or report.
+    It should only update Home ID login state.
     """
 
     st.subheader("Home ID Login")
@@ -1156,6 +1158,10 @@ def show_home_id_login_box(key_prefix="home_id"):
             "Database saving is disabled. Enable DATABASE_ENABLED=true before creating or using Home IDs."
         )
         return
+
+    if st.session_state.get("home_id"):
+        st.success(f"Currently logged in with Home ID: {st.session_state['home_id']}")
+        st.caption("Your current score/report is still preserved.")
 
     if st.session_state.get("home_login_error"):
         st.error(st.session_state["home_login_error"])
@@ -1181,9 +1187,15 @@ def show_home_id_login_box(key_prefix="home_id"):
         ):
             try:
                 created_home_id = create_random_available_home_id()
+
+                st.session_state["home_id"] = created_home_id
+                st.session_state["last_created_home_id"] = created_home_id
+                st.session_state["home_login_error"] = None
+                st.session_state["home_login_message"] = "New Home ID created."
+
                 st.success(f"Created Home ID: {created_home_id}")
                 st.warning("Copy this Home ID now. You need it later to view saved checks.")
-                st.rerun()
+                st.info("Your current score/report was kept. You can now save this result.")
 
             except Exception as error:
                 st.error("Could not create a random Home ID.")
@@ -1221,7 +1233,7 @@ def show_home_id_login_box(key_prefix="home_id"):
             if created:
                 st.success(f"Created Home ID: {st.session_state['home_id']}")
                 st.warning("Copy this Home ID now. You need it later to view saved checks.")
-                st.rerun()
+                st.info("Your current score/report was kept. You can now save this result.")
 
     with tab3:
         st.write("Log in with an existing Home ID.")
@@ -1241,7 +1253,7 @@ def show_home_id_login_box(key_prefix="home_id"):
 
             if logged_in:
                 st.success("Home ID login successful.")
-                st.rerun()
+                st.info("Your current score/report was kept. You can now save this result.")
 
 def show_saved_result_id_box(saved_id):
     """
@@ -1900,7 +1912,10 @@ def show_database_save_panel():
 
     st.divider()
     st.subheader("Save Anonymous Result")
-
+    if st.session_state.get("report_text"):
+        st.caption("Creating or logging in with a Home ID will not delete this report.")
+    elif st.session_state.get("score") is not None:
+        st.caption("Creating or logging in with a Home ID will not delete this score.")
     if not is_database_enabled():
         st.info(
             "Database saving is currently disabled. "
@@ -1916,8 +1931,15 @@ def show_database_save_panel():
             "This keeps saved checks grouped by anonymous Home ID."
         )
 
-        show_home_id_login_box()
-        return
+        show_home_id_login_box(key_prefix="save_panel_home_id")
+
+        home_id = get_logged_in_home_id()
+
+        if not home_id:
+            return
+
+        st.success("Home ID is ready. Your current result was preserved.")
+
     show_home_id_status(key_suffix="save_panel")
     show_home_id_status()
     score = st.session_state.get("score")
