@@ -8,6 +8,7 @@ from src.scoring import (
 )
 from src.database import (
     fetch_recent_room_checks,
+    fetch_room_check_with_details,
     fetch_summary_stats,
     get_database_status_message,
     is_database_enabled,
@@ -881,6 +882,36 @@ def finish_checklist():
     st.session_state["checklist_answers"] = build_ordered_checklist_answers()
     go_to_page("checklist_summary")
 
+def group_saved_result_details(details):
+    """
+    Groups saved detail rows by type.
+    """
+
+    grouped = {
+        "ai_hazard": [],
+        "checklist_answer": [],
+        "recommended_fix": [],
+    }
+
+    for detail in details:
+        detail_type = detail.get("detail_type")
+
+        if detail_type in grouped:
+            grouped[detail_type].append(detail)
+
+    return grouped
+
+
+def show_saved_result_id_box(saved_id):
+    """
+    Shows a saved result ID clearly so it can be copied.
+    """
+
+    if not saved_id:
+        return
+
+    st.code(saved_id, language="text")
+    st.caption("Copy this ID to look up the saved result later.")
 
 def skip_entire_checklist():
     """
@@ -1262,7 +1293,7 @@ def show_recent_saved_room_checks(rows):
         room_type = safe_text(row.get("room_type", "Unknown Room"))
         risk_level = safe_text(row.get("risk_level", "Unknown"))
         ai_mode = safe_text(row.get("ai_mode", "unknown"))
-
+        saved_id = safe_text(row.get("id", ""))
         score = row.get("score", 0)
         hazard_count = row.get("hazard_count", 0)
         checklist_was_skipped = row.get("checklist_was_skipped", False)
@@ -1275,6 +1306,7 @@ def show_recent_saved_room_checks(rows):
             f"""
             <div class="plain-card">
                 <strong>Saved Check {index}</strong><br>
+                Saved ID: {saved_id}<br>
                 Room: {room_type}<br>
                 Score: {score}/100<br>
                 Risk Label: {risk_level}<br>
@@ -1549,7 +1581,11 @@ def show_database_save_panel():
         saved_id = st.session_state.get("database_save_id")
 
         if saved_id:
-            st.caption(f"Saved result ID: {saved_id}")
+            st.caption("Saved result ID:")
+            show_saved_result_id_box(saved_id)
+
+        if st.button("Look Up This Saved Result"):
+            go_to_page("lookup_saved_result")
 
         return
 
@@ -2328,6 +2364,140 @@ def show_home_summary_page():
         reset_current_room_check()
         clear_home_summary()
         go_to_page("landing")
+
+def show_lookup_saved_result_page():
+    st.title("🏠 AI SafeHome")
+    st.subheader("Lookup Saved Result by ID")
+
+    st.caption(get_database_status_message())
+
+    st.warning(
+        "This page retrieves anonymous saved room-check results only. "
+        "Uploaded photos, names, addresses, medical history, medication lists, "
+        "faces, mail, bills, and medical documents should not be stored or shown."
+    )
+
+    if not is_database_enabled():
+        st.info("Database saving is disabled, so saved results cannot be retrieved.")
+
+        if st.button("← Back to Landing Page"):
+            go_to_page("landing")
+
+        return
+
+    saved_id = st.text_input(
+        "Paste saved result ID",
+        placeholder="Example: 123e4567-e89b-12d3-a456-426614174000",
+    )
+
+    if st.button("Retrieve Saved Result", type="primary"):
+        if not saved_id.strip():
+            st.error("Paste a saved result ID first.")
+            return
+
+        try:
+            result = fetch_room_check_with_details(saved_id.strip())
+
+        except Exception as error:
+            st.error("Could not retrieve saved result.")
+
+            with st.expander("Technical details"):
+                st.code(str(error))
+
+            return
+
+        if not result:
+            st.warning("No saved result was found with that ID.")
+            return
+
+        room_check = result["room_check"]
+        details = result["details"]
+        grouped_details = group_saved_result_details(details)
+
+        st.success("Saved result found.")
+
+        created_at = format_database_datetime(room_check.get("created_at"))
+
+        st.markdown(
+            f"""
+            <div class="plain-card">
+                <strong>Saved Result ID:</strong> {safe_text(room_check.get("id"))}<br>
+                <strong>Room:</strong> {safe_text(room_check.get("room_type"))}<br>
+                <strong>Score:</strong> {safe_text(room_check.get("score"))}/100<br>
+                <strong>Risk Label:</strong> {safe_text(room_check.get("risk_level"))}<br>
+                <strong>AI Mode:</strong> {safe_text(room_check.get("ai_mode"))}<br>
+                <strong>Checklist Skipped:</strong> {safe_text(room_check.get("checklist_was_skipped"))}<br>
+                <strong>Hazard Count:</strong> {safe_text(room_check.get("hazard_count"))}<br>
+                <strong>Safety Confirmed:</strong> {safe_text(room_check.get("safety_confirmed"))}<br>
+                <strong>Saved At:</strong> {safe_text(created_at)}
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+        st.subheader("AI Hazards")
+
+        hazards = grouped_details["ai_hazard"]
+
+        if not hazards:
+            st.info("No AI hazard detail rows were saved for this result.")
+        else:
+            for hazard in hazards:
+                st.markdown(
+                    f"""
+                    <div class="plain-card">
+                        <strong>{safe_text(hazard.get("title", "Possible hazard"))}</strong><br>
+                        Category: {safe_text(hazard.get("category"))}<br>
+                        Explanation: {safe_text(hazard.get("explanation"))}<br>
+                        Recommendation: {safe_text(hazard.get("recommendation"))}<br>
+                        Priority: {safe_text(hazard.get("priority"))}
+                    </div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+        st.subheader("Checklist Answers")
+
+        checklist_rows = grouped_details["checklist_answer"]
+
+        if not checklist_rows:
+            st.info("No checklist answers were saved for this result.")
+        else:
+            for answer in checklist_rows:
+                st.write(
+                    f"- **{answer.get('checklist_question')}** — "
+                    f"{answer.get('checklist_answer')}"
+                )
+
+        st.subheader("Recommended Fixes")
+
+        fix_rows = grouped_details["recommended_fix"]
+
+        if not fix_rows:
+            st.info("No recommended fixes were saved for this result.")
+        else:
+            for fix in fix_rows:
+                priority = fix.get("priority") or "No priority label"
+                recommendation = fix.get("recommendation") or "Review this area carefully."
+                source = fix.get("title") or "Saved recommendation"
+
+                st.write(f"- **[{priority}]** {recommendation}")
+                st.caption(f"Source: {source}")
+
+    st.divider()
+
+    if st.button("View Saved Results Dashboard"):
+        go_to_page("saved_results")
+
+    if st.button("Start New Safety Check"):
+        if "reset_current_room_check" in globals():
+            reset_current_room_check()
+
+        go_to_page("room_selection")
+
+    if st.button("← Back to Landing Page"):
+        go_to_page("landing")
+
 def main():
     setup_page()
     initialize_session_state()
@@ -2356,6 +2526,8 @@ def main():
         show_home_summary_page()     
     elif current_page == "saved_results":
         show_saved_results_page()    
+    elif current_page == "lookup_saved_result":
+        show_lookup_saved_result_page()    
     else:
         st.error("Unknown page. Returning to landing page.")
         st.session_state["page"] = "landing"

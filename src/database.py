@@ -25,7 +25,7 @@ Never store:
 
 import os
 from typing import Any, Optional, Union
-
+from uuid import UUID
 from dotenv import load_dotenv
 from supabase import Client, create_client
 
@@ -72,6 +72,18 @@ def get_database_status_message() -> str:
 
     return "Database saving is disabled."
 
+def is_valid_uuid(value: str) -> bool:
+    """
+    Checks whether a value is a valid UUID string.
+
+    Supabase room_checks IDs are UUIDs.
+    """
+
+    try:
+        UUID(str(value))
+        return True
+    except ValueError:
+        return False
 
 def get_ai_mode() -> str:
     """
@@ -373,7 +385,72 @@ def fetch_recent_room_checks(limit: int = 20) -> list[dict[str, Any]]:
 
     return response.data or []
 
+def fetch_room_check_by_id(room_check_id: str) -> dict[str, Any] | None:
+    """
+    Fetches one anonymous room check by ID.
 
+    Returns None if no matching row exists.
+    """
+
+    if not is_database_enabled():
+        return None
+
+    if not is_valid_uuid(room_check_id):
+        raise ValueError("Invalid saved result ID. Expected a UUID.")
+
+    client = get_supabase_client()
+
+    response = (
+        client.table("room_checks")
+        .select("*")
+        .eq("id", room_check_id)
+        .maybe_single()
+        .execute()
+    )
+
+    return response.data
+
+
+def fetch_room_check_details_by_id(room_check_id: str) -> list[dict[str, Any]]:
+    """
+    Fetches detail rows for one saved room check.
+    """
+
+    if not is_database_enabled():
+        return []
+
+    if not is_valid_uuid(room_check_id):
+        raise ValueError("Invalid saved result ID. Expected a UUID.")
+
+    client = get_supabase_client()
+
+    response = (
+        client.table("room_check_details")
+        .select("*")
+        .eq("room_check_id", room_check_id)
+        .order("created_at", desc=False)
+        .execute()
+    )
+
+    return response.data or []
+
+
+def fetch_room_check_with_details(room_check_id: str) -> dict[str, Any] | None:
+    """
+    Fetches one saved room check plus its hazards, checklist answers, and fixes.
+    """
+
+    room_check = fetch_room_check_by_id(room_check_id)
+
+    if not room_check:
+        return None
+
+    details = fetch_room_check_details_by_id(room_check_id)
+
+    return {
+        "room_check": room_check,
+        "details": details,
+    }
 def fetch_summary_stats() -> dict[str, Any]:
     """
     Fetches simple summary stats for saved anonymous room checks.
