@@ -1,8 +1,8 @@
-name: Ping Streamlit App
+name: Keep Streamlit App Awake
 
 on:
   schedule:
-    - cron: "17 */6 * * *"
+    - cron: "0 */6 * * *"
   workflow_dispatch:
 
 jobs:
@@ -11,5 +11,4 @@ jobs:
 
     steps:
       - name: Ping Streamlit app
-        run: |
-          curl -L --max-time 30 --retry 2 --retry-delay 10 "https://ai-safehome.streamlit.app/"
+        run: curl -L https://ai-safehome.streamlit.app
