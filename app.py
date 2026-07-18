@@ -11,7 +11,23 @@ from typing import Any, Dict, List, Optional, Union
 
 import streamlit as st
 from PIL import Image
+try:
+    from src.email_service import (
+        get_email_status_message,
+        is_email_enabled,
+        send_summary_email,
+    )
+except Exception as email_import_error:
+    EMAIL_IMPORT_ERROR_MESSAGE = str(email_import_error)
 
+    def is_email_enabled() -> bool:
+        return False
+
+    def get_email_status_message() -> str:
+        return f"Server-side email unavailable: {EMAIL_IMPORT_ERROR_MESSAGE}"
+
+    def send_summary_email(*args, **kwargs):
+        raise RuntimeError("Server-side email unavailable.")
 try:
     from src.ai_analysis import analyze_photo as project_analyze_photo
 except Exception:
@@ -841,9 +857,21 @@ def shorten_email_body(text: str, max_length: int = 4500) -> str:
 
 
 def create_mailto_link(to_email: str, subject: str, body: str) -> str:
-    params = urllib.parse.urlencode({"subject": subject, "body": shorten_email_body(body)})
-    return f"mailto:{urllib.parse.quote(str(to_email or '').strip())}?{params}"
+    """
+    Creates a mailto link that opens the user's email app.
 
+    Uses %20 instead of + for spaces because some email apps show + signs literally.
+    """
+
+    clean_to_email = str(to_email or "").strip()
+    clean_subject = str(subject or "").strip()
+    clean_body = shorten_email_body(str(body or ""))
+
+    encoded_to_email = urllib.parse.quote(clean_to_email, safe="@.,;:+-_")
+    encoded_subject = urllib.parse.quote(clean_subject, safe="")
+    encoded_body = urllib.parse.quote(clean_body, safe="")
+
+    return f"mailto:{encoded_to_email}?subject={encoded_subject}&body={encoded_body}"
 
 def build_email_footer() -> str:
     return """
@@ -855,17 +883,110 @@ Uploaded photos are not included in this email.
 """.strip()
 
 
-def show_email_summary_panel(summary_title: str, summary_text: str, default_subject: str, key_prefix: str) -> None:
-    with st.expander("Email this summary"):
-        st.warning("This creates an email draft in your email app. AI SafeHome does not send the email automatically and does not store the recipient email.")
-        recipient = st.text_input("Recipient email", placeholder="example@email.com", key=f"{key_prefix}_recipient")
-        subject = st.text_input("Email subject", value=default_subject, key=f"{key_prefix}_subject")
-        body = f"{summary_title}\n\n{summary_text}\n\n{build_email_footer()}".strip()
-        st.text_area("Email body preview", value=body, height=300, key=f"{key_prefix}_body")
-        link = create_mailto_link(recipient, subject, body)
-        st.markdown(f'<a href="{html.escape(link, quote=True)}" target="_blank" class="email-link-button">Open Email Draft</a>', unsafe_allow_html=True)
-        st.caption("If the email draft does not open, copy the email body above and paste it into your email app.")
+def show_email_summary_panel(
+    summary_title: str,
+    summary_text: str,
+    default_subject: str,
+    key_prefix: str,
+) -> None:
+    """
+    Shows server-side email sending with mailto fallback.
 
+    Server-side email:
+    - sends through Brevo API
+    - does not store recipient email
+    - does not attach photos
+
+    Mailto fallback:
+    - opens user's own email app
+    """
+
+    with st.expander("Email this summary"):
+        st.warning(
+            "Only send privacy-safe summaries. Do not include names, addresses, "
+            "medical history, medication lists, faces, mail, bills, medication bottles, "
+            "or medical documents."
+        )
+
+        st.caption(get_email_status_message())
+
+        recipient = st.text_input(
+            "Recipient email",
+            placeholder="example@email.com",
+            key=f"{key_prefix}_recipient",
+        )
+
+        subject = st.text_input(
+            "Email subject",
+            value=default_subject,
+            key=f"{key_prefix}_subject",
+        )
+
+        body = f"{summary_title}\n\n{summary_text}\n\n{build_email_footer()}".strip()
+
+        st.text_area(
+            "Email body preview",
+            value=body,
+            height=300,
+            key=f"{key_prefix}_body",
+        )
+
+        privacy_confirmed = st.checkbox(
+            "I confirm this email contains no personal, medical, or real patient information.",
+            key=f"{key_prefix}_privacy_confirmed",
+        )
+
+        if is_email_enabled():
+            if st.button(
+                "Send Email from AI SafeHome",
+                key=f"{key_prefix}_server_send",
+                type="primary",
+            ):
+                if not privacy_confirmed:
+                    st.error(
+                        "Confirm the privacy checkbox before sending."
+                    )
+                    return
+
+                try:
+                    message_id = send_summary_email(
+                        recipient_email=recipient,
+                        subject=subject,
+                        text_body=body,
+                    )
+
+                    st.success(
+                        "Email sent. Uploaded photos were not included."
+                    )
+
+                    st.caption(f"Email provider message ID: {message_id}")
+
+                except Exception as error:
+                    st.error(
+                        "Could not send the email. You can still use the email draft backup below."
+                    )
+
+                    with st.expander("Technical details"):
+                        st.code(str(error))
+        else:
+            st.info(
+                "Server-side email is disabled. Use the email draft backup below."
+            )
+
+        st.divider()
+
+        st.write("Backup option: open an email draft")
+
+        link = create_mailto_link(recipient, subject, body)
+
+        st.markdown(
+            f'<a href="{html.escape(link, quote=True)}" target="_blank" class="email-link-button">Open Email Draft</a>',
+            unsafe_allow_html=True,
+        )
+
+        st.caption(
+            "If the draft does not open, copy the email body above and paste it into your email app."
+        )
 
 def safe_filename_part(value: Any) -> str:
     """

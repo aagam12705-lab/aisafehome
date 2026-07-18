@@ -3,3 +3,4 @@ pillow
 python-dotenv
 openai
 supabase
+requests
