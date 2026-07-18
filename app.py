@@ -1,5 +1,8 @@
+import csv
 import html
+import io
 import os
+import re
 import secrets
 import string
 import urllib.parse
@@ -864,6 +867,66 @@ def show_email_summary_panel(summary_title: str, summary_text: str, default_subj
         st.caption("If the email draft does not open, copy the email body above and paste it into your email app.")
 
 
+def safe_filename_part(value: Any) -> str:
+    """
+    Converts text into a safe filename part.
+
+    Example: BEDROOM-1 stays BEDROOM-1.
+    """
+
+    cleaned = str(value or "summary").strip().upper()
+    cleaned = re.sub(r"[^A-Z0-9-]+", "-", cleaned)
+    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
+    return cleaned or "SUMMARY"
+
+
+def show_share_summary_panel(
+    summary_title: str,
+    summary_text: str,
+    file_name: str,
+    key_prefix: str,
+) -> None:
+    """
+    Shows privacy-safe sharing options for report/stat text.
+
+    This does not create a public link and does not expose the Home ID.
+    """
+
+    with st.expander("Share / export this summary"):
+        st.warning(
+            "Share only with people who should see this summary. "
+            "Do not add names, addresses, medical history, medication lists, faces, "
+            "mail, bills, medication bottles, or medical documents."
+        )
+
+        st.caption(
+            "This does not create a public web link. It only lets you copy or download "
+            "the summary text from this browser session."
+        )
+
+        export_text = f"{summary_title}\n\n{summary_text}\n\n{build_email_footer()}".strip()
+
+        st.download_button(
+            label="Download Shareable Text File",
+            data=export_text,
+            file_name=file_name,
+            mime="text/plain",
+            key=f"{key_prefix}_download",
+        )
+
+        st.text_area(
+            "Copyable share text",
+            value=export_text,
+            height=300,
+            key=f"{key_prefix}_copy_text",
+        )
+
+        st.info(
+            "For a quick phone share: download the text file, or copy the text above "
+            "and paste it into Messages, email, or a document."
+        )
+
+
 # -----------------------------------------------------------------------------
 # Pages
 # -----------------------------------------------------------------------------
@@ -1499,26 +1562,80 @@ def show_room_stats_overview(room_stats_list: List[Dict[str, Any]]) -> None:
     col4.metric("Home Avg Score", f"{avg_score}/100")
 
 
+def format_score_value(value: Any) -> str:
+    """
+    Formats a score safely for email/export text.
+    """
+
+    if value is None:
+        return "No saved score yet"
+
+    return f"{value}/100"
+
+
 def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
+    """
+    Builds a plain-text summary for one room's saved stats.
+
+    This is used for email drafts and export/copy text.
+    It does not include Home ID, photos, names, addresses, or medical info.
+    """
+
     hazard_counts = room_stats.get("hazard_counts", {})
     checklist_counts = room_stats.get("checklist_answer_counts", {})
-    hazard_lines = [f"- {get_category_label(category)}: {count}" for category, count in sorted(hazard_counts.items(), key=lambda x: x[1], reverse=True)] or ["- No saved hazards yet."]
-    checklist_lines = [f"- {answer}: {count}" for answer, count in sorted(checklist_counts.items())] or ["- No saved checklist answers yet."]
+
+    hazard_lines = [
+        f"- {get_category_label(category)}: {count}"
+        for category, count in sorted(
+            hazard_counts.items(),
+            key=lambda item: item[1],
+            reverse=True,
+        )
+    ]
+
+    if not hazard_lines:
+        hazard_lines = ["- No saved hazards yet."]
+
+    checklist_lines = [
+        f"- {answer}: {count}"
+        for answer, count in sorted(checklist_counts.items())
+    ]
+
+    if not checklist_lines:
+        checklist_lines = ["- No saved checklist answers yet."]
+
     return f"""
-Room ID: {room_stats.get('room_id')}
-Room Type: {room_stats.get('room_type')}
-Checks Saved: {room_stats.get('check_count', 0)}
-Average Score: {room_stats.get('average_score', 0)}/100
-Latest Score: {room_stats.get('latest_score')}/100
-Highest Score: {room_stats.get('highest_score')}/100
-Lowest Score: {room_stats.get('lowest_score')}/100
-Latest Risk Label: {room_stats.get('latest_risk_level')}
-Latest Check: {format_database_datetime(room_stats.get('latest_created_at'))}
+Room ID:
+{room_stats.get("room_id") or "Unknown Room ID"}
+
+Room Type:
+{room_stats.get("room_type") or "Unknown Room Type"}
+
+Checks Saved:
+{room_stats.get("check_count", 0)}
+
+Average Score:
+{format_score_value(room_stats.get("average_score"))}
+
+Latest Score:
+{format_score_value(room_stats.get("latest_score"))}
+
+Highest Score:
+{format_score_value(room_stats.get("highest_score"))}
+
+Lowest Score:
+{format_score_value(room_stats.get("lowest_score"))}
+
+Latest Risk Label:
+{room_stats.get("latest_risk_level") or "No saved risk label yet"}
+
+Latest Check:
+{format_database_datetime(room_stats.get("latest_created_at"))}
 
 Risk Label Counts:
-Low Risk: {room_stats.get('low_risk_count', 0)}
-Moderate Risk: {room_stats.get('moderate_risk_count', 0)}
-High Risk: {room_stats.get('high_risk_count', 0)}
+Low Risk: {room_stats.get("low_risk_count", 0)}
+Moderate Risk: {room_stats.get("moderate_risk_count", 0)}
+High Risk: {room_stats.get("high_risk_count", 0)}
 
 Most Common Hazards:
 {chr(10).join(hazard_lines)}
@@ -1527,6 +1644,435 @@ Checklist Answer Summary:
 {chr(10).join(checklist_lines)}
 """.strip()
 
+
+def build_all_room_stats_csv(room_stats_list: List[Dict[str, Any]]) -> str:
+    """
+    Builds a CSV export for all rooms under the logged-in Home ID.
+
+    This does not include the Home ID or uploaded photos.
+    """
+
+    output = io.StringIO()
+
+    fieldnames = [
+        "room_id",
+        "room_type",
+        "check_count",
+        "average_score",
+        "latest_score",
+        "highest_score",
+        "lowest_score",
+        "latest_risk_level",
+        "latest_created_at",
+        "low_risk_count",
+        "moderate_risk_count",
+        "high_risk_count",
+        "top_hazard",
+        "recommended_fix_count",
+    ]
+
+    writer = csv.DictWriter(output, fieldnames=fieldnames)
+    writer.writeheader()
+
+    for room in room_stats_list:
+        writer.writerow(
+            {
+                "room_id": room.get("room_id"),
+                "room_type": room.get("room_type"),
+                "check_count": room.get("check_count", 0),
+                "average_score": room.get("average_score", 0),
+                "latest_score": room.get("latest_score"),
+                "highest_score": room.get("highest_score"),
+                "lowest_score": room.get("lowest_score"),
+                "latest_risk_level": room.get("latest_risk_level"),
+                "latest_created_at": format_database_datetime(room.get("latest_created_at")),
+                "low_risk_count": room.get("low_risk_count", 0),
+                "moderate_risk_count": room.get("moderate_risk_count", 0),
+                "high_risk_count": room.get("high_risk_count", 0),
+                "top_hazard": room.get("top_hazard"),
+                "recommended_fix_count": room.get("recommended_fix_count", 0),
+            }
+        )
+
+    return output.getvalue()
+
+
+def show_all_room_stats_csv_export(room_stats_list: List[Dict[str, Any]]) -> None:
+    """
+    Shows a CSV export for all room stats on the stats page.
+    """
+
+    with st.expander("Export all room stats as CSV"):
+        st.warning(
+            "This CSV does not include Home ID, uploaded photos, names, addresses, "
+            "medical history, medication lists, faces, mail, bills, or medical documents."
+        )
+
+        st.download_button(
+            label="Download All Room Stats (.csv)",
+            data=build_all_room_stats_csv(room_stats_list),
+            file_name="ai_safehome_all_room_stats.csv",
+            mime="text/csv",
+            key="all_room_stats_csv_download",
+        )
+
+def get_check_display_label(check_row: Dict[str, Any]) -> str:
+    """
+    Creates a readable label for a saved room check.
+    """
+
+    created_at = format_database_datetime(check_row.get("created_at"))
+    score = check_row.get("score", "None")
+    risk_level = check_row.get("risk_level", "Unknown Risk")
+    check_id = str(check_row.get("id", ""))[:8]
+
+    return f"{created_at} — {score}/100 — {risk_level} — {check_id}"
+
+
+def sort_checks_oldest_to_newest(check_rows: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Sorts saved checks from oldest to newest.
+    Supabase timestamps sort correctly as strings.
+    """
+
+    return sorted(
+        check_rows,
+        key=lambda row: str(row.get("created_at") or ""),
+    )
+
+
+def get_hazard_categories_from_details(detail_rows: List[Dict[str, Any]]) -> set:
+    """
+    Extracts hazard categories from detail rows for one saved check.
+    """
+
+    categories = set()
+
+    for detail in detail_rows:
+        if detail.get("detail_type") == "ai_hazard":
+            category = detail.get("category") or "unclear"
+            categories.add(category)
+
+    return categories
+
+
+def get_hazard_titles_by_category(detail_rows: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """
+    Groups hazard titles by category.
+    """
+
+    grouped: Dict[str, List[str]] = {}
+
+    for detail in detail_rows:
+        if detail.get("detail_type") != "ai_hazard":
+            continue
+
+        category = detail.get("category") or "unclear"
+        title = detail.get("title") or get_category_label(category)
+
+        if category not in grouped:
+            grouped[category] = []
+
+        grouped[category].append(title)
+
+    return grouped
+
+
+def get_score_change_message(before_score: Any, after_score: Any) -> tuple[str, str]:
+    """
+    Returns a plain-English score comparison message.
+    Lower score is better because it means fewer hazard points.
+    """
+
+    if before_score is None or after_score is None:
+        return "Not enough score data.", "info"
+
+    before_score = int(before_score)
+    after_score = int(after_score)
+
+    change = after_score - before_score
+
+    if change < 0:
+        return f"Improved by {abs(change)} points.", "success"
+
+    if change > 0:
+        return f"Score increased by {change} points. Review this room again.", "warning"
+
+    return "No score change.", "info"
+
+
+def show_hazard_category_list(title: str, categories: set) -> None:
+    """
+    Shows a small list of hazard categories.
+    """
+
+    st.write(f"**{title}**")
+
+    if not categories:
+        st.write("- None")
+        return
+
+    for category in sorted(categories):
+        st.write(f"- {get_category_label(category)}")
+
+
+def show_before_after_hazard_titles(
+    label: str,
+    categories: set,
+    titles_by_category: Dict[str, List[str]],
+) -> None:
+    """
+    Shows hazard titles for selected categories.
+    """
+
+    with st.expander(label):
+        if not categories:
+            st.write("None")
+            return
+
+        for category in sorted(categories):
+            st.write(f"**{get_category_label(category)}**")
+
+            titles = titles_by_category.get(category, [])
+
+            if not titles:
+                st.write("- No saved title")
+            else:
+                for title in titles:
+                    st.write(f"- {title}")
+
+
+def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
+    """
+    Shows before/after comparison for one Room ID.
+
+    Compares the first saved check and latest saved check by default.
+    Also lets the user choose two checks manually.
+    """
+
+    st.subheader("Before / After Room Comparison")
+
+    st.caption(
+        "Lower scores are better. This compares saved checks for the same Room ID."
+    )
+
+    try:
+        check_rows = fetch_room_checks_by_room_id(
+            home_id=home_id,
+            room_id=room_id,
+            limit=100,
+        )
+
+    except Exception as error:
+        st.error("Could not load saved checks for before/after comparison.")
+
+        with st.expander("Technical details"):
+            st.code(str(error))
+
+        return
+
+    if len(check_rows) < 2:
+        st.info(
+            "This room needs at least two saved checks before a before/after comparison can be shown."
+        )
+        return
+
+    sorted_checks = sort_checks_oldest_to_newest(check_rows)
+
+    first_check = sorted_checks[0]
+    latest_check = sorted_checks[-1]
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Default comparison:</strong><br>
+            Before = first saved check<br>
+            After = latest saved check
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Choose different checks to compare"):
+        check_options = {
+            get_check_display_label(row): row
+            for row in sorted_checks
+        }
+
+        before_label = st.selectbox(
+            "Before check",
+            list(check_options.keys()),
+            index=0,
+            key=f"{room_id}_before_check_select",
+        )
+
+        after_label = st.selectbox(
+            "After check",
+            list(check_options.keys()),
+            index=len(check_options) - 1,
+            key=f"{room_id}_after_check_select",
+        )
+
+        first_check = check_options[before_label]
+        latest_check = check_options[after_label]
+
+    before_score = first_check.get("score")
+    after_score = latest_check.get("score")
+
+    change_message, message_type = get_score_change_message(
+        before_score,
+        after_score,
+    )
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        st.metric(
+            "Before Score",
+            f"{before_score}/100",
+        )
+
+    with col2:
+        st.metric(
+            "After Score",
+            f"{after_score}/100",
+        )
+
+    with col3:
+        if before_score is not None and after_score is not None:
+            delta_value = int(after_score) - int(before_score)
+            st.metric(
+                "Score Change",
+                delta_value,
+                delta=f"{delta_value} points",
+            )
+        else:
+            st.metric("Score Change", "N/A")
+
+    if message_type == "success":
+        st.success(change_message)
+    elif message_type == "warning":
+        st.warning(change_message)
+    else:
+        st.info(change_message)
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Before Check</strong><br>
+            Check ID: {safe_text(first_check.get("id"))}<br>
+            Saved At: {safe_text(format_database_datetime(first_check.get("created_at")))}<br>
+            Risk Label: {safe_text(first_check.get("risk_level"))}<br>
+            Hazards Saved: {safe_text(first_check.get("hazard_count"))}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>After Check</strong><br>
+            Check ID: {safe_text(latest_check.get("id"))}<br>
+            Saved At: {safe_text(format_database_datetime(latest_check.get("created_at")))}<br>
+            Risk Label: {safe_text(latest_check.get("risk_level"))}<br>
+            Hazards Saved: {safe_text(latest_check.get("hazard_count"))}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    try:
+        before_details = fetch_room_check_details(first_check["id"])
+        after_details = fetch_room_check_details(latest_check["id"])
+
+    except Exception as error:
+        st.error("Could not load check details for before/after comparison.")
+
+        with st.expander("Technical details"):
+            st.code(str(error))
+
+        return
+
+    before_categories = get_hazard_categories_from_details(before_details)
+    after_categories = get_hazard_categories_from_details(after_details)
+
+    resolved_hazards = before_categories - after_categories
+    still_present_hazards = before_categories & after_categories
+    new_hazards = after_categories - before_categories
+
+    st.subheader("Hazard Changes")
+
+    col1, col2, col3 = st.columns(3)
+
+    with col1:
+        show_hazard_category_list("Resolved", resolved_hazards)
+
+    with col2:
+        show_hazard_category_list("Still Present", still_present_hazards)
+
+    with col3:
+        show_hazard_category_list("New", new_hazards)
+
+    before_titles = get_hazard_titles_by_category(before_details)
+    after_titles = get_hazard_titles_by_category(after_details)
+
+    show_before_after_hazard_titles(
+        "Before check hazard titles",
+        before_categories,
+        before_titles,
+    )
+
+    show_before_after_hazard_titles(
+        "After check hazard titles",
+        after_categories,
+        after_titles,
+    )
+
+    comparison_text = f"""
+AI SafeHome Before / After Room Comparison
+
+Room ID: {room_id}
+
+Before Check:
+Date: {format_database_datetime(first_check.get("created_at"))}
+Score: {before_score}/100
+Risk Label: {first_check.get("risk_level")}
+
+After Check:
+Date: {format_database_datetime(latest_check.get("created_at"))}
+Score: {after_score}/100
+Risk Label: {latest_check.get("risk_level")}
+
+Result:
+{change_message}
+
+Resolved Hazards:
+{chr(10).join("- " + get_category_label(category) for category in sorted(resolved_hazards)) if resolved_hazards else "- None"}
+
+Still Present Hazards:
+{chr(10).join("- " + get_category_label(category) for category in sorted(still_present_hazards)) if still_present_hazards else "- None"}
+
+New Hazards:
+{chr(10).join("- " + get_category_label(category) for category in sorted(new_hazards)) if new_hazards else "- None"}
+
+Reminder:
+This comparison is based on saved room-check results. AI may miss hazards. Human review is recommended.
+""".strip()
+
+    show_email_summary_panel(
+        summary_title="AI SafeHome Before / After Room Comparison",
+        summary_text=comparison_text,
+        default_subject=f"AI SafeHome Before/After Comparison - {room_id}",
+        key_prefix=f"before_after_email_{safe_filename_part(room_id)}",
+    )
+
+    show_share_summary_panel(
+        summary_title="AI SafeHome Before / After Room Comparison",
+        summary_text=comparison_text,
+        file_name=f"ai_safehome_before_after_{safe_filename_part(room_id)}.txt",
+        key_prefix=f"before_after_share_{safe_filename_part(room_id)}",
+    )
 
 def show_room_stats_page() -> None:
     st.title("🏠 AI SafeHome")
@@ -1596,10 +2142,10 @@ def show_room_stats_page() -> None:
             <strong>Room ID:</strong> {safe_text(selected_stats.get('room_id'))}<br>
             <strong>Room Type:</strong> {safe_text(selected_stats.get('room_type'))}<br>
             <strong>Checks Saved:</strong> {safe_text(selected_stats.get('check_count', 0))}<br>
-            <strong>Average Score:</strong> {safe_text(selected_stats.get('average_score', 0))}/100<br>
-            <strong>Latest Score:</strong> {safe_text(selected_stats.get('latest_score'))}/100<br>
-            <strong>Highest Score:</strong> {safe_text(selected_stats.get('highest_score'))}/100<br>
-            <strong>Lowest Score:</strong> {safe_text(selected_stats.get('lowest_score'))}/100<br>
+            <strong>Average Score:</strong> {safe_text(format_score_value(selected_stats.get('average_score')))}<br>
+            <strong>Latest Score:</strong> {safe_text(format_score_value(selected_stats.get('latest_score')))}<br>
+            <strong>Highest Score:</strong> {safe_text(format_score_value(selected_stats.get('highest_score')))}<br>
+            <strong>Lowest Score:</strong> {safe_text(format_score_value(selected_stats.get('lowest_score')))}<br>
             <strong>Latest Risk Label:</strong> {safe_text(selected_stats.get('latest_risk_level'))}
         </div>
         """,
@@ -1621,6 +2167,12 @@ def show_room_stats_page() -> None:
         st.info("No checklist answers have been saved for this room yet.")
 
     st.subheader("Check History for This Room")
+    st.divider()
+
+    show_before_after_room_comparison(
+        home_id=home_id,
+        room_id=selected_room_id,
+    )
     try:
         history = fetch_room_checks_by_room_id(home_id=home_id, room_id=selected_room_id, limit=100)
     except Exception as error:
@@ -1633,7 +2185,24 @@ def show_room_stats_page() -> None:
     else:
         st.info("No checks have been saved for this room yet.")
 
-    show_email_summary_panel("AI SafeHome Room Stats Summary", build_room_stats_email_text(selected_stats), f"AI SafeHome Room Stats - {selected_room_id}", "room_stats_email")
+    room_stats_share_text = build_room_stats_email_text(selected_stats)
+    room_stats_file_name = f"ai_safehome_room_stats_{safe_filename_part(selected_room_id)}.txt"
+
+    show_email_summary_panel(
+        "AI SafeHome Room Stats Summary",
+        room_stats_share_text,
+        f"AI SafeHome Room Stats - {selected_room_id}",
+        "room_stats_email",
+    )
+
+    show_share_summary_panel(
+        "AI SafeHome Room Stats Summary",
+        room_stats_share_text,
+        room_stats_file_name,
+        "room_stats_share",
+    )
+
+    show_all_room_stats_csv_export(room_stats_list)
 
     if st.button("Analyze This Room Again"):
         st.session_state["room_type"] = selected_stats.get("room_type")
