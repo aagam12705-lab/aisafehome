@@ -59,11 +59,13 @@ try:
     )
 except Exception as database_import_error:
     # Safe stubs so the app can still run if database.py is broken or Supabase is missing.
+    DATABASE_IMPORT_ERROR_MESSAGE = str(database_import_error)
+
     def is_database_enabled() -> bool:
         return False
 
     def get_database_status_message() -> str:
-        return f"Database unavailable: {database_import_error}"
+        return f"Database unavailable: {DATABASE_IMPORT_ERROR_MESSAGE}"
 
     def is_valid_home_id(home_id: Optional[str]) -> bool:
         return False
@@ -328,6 +330,10 @@ def add_mobile_friendly_style() -> None:
     elif color_scheme == "High Contrast":
         theme_css = """
         :root { --safe-bg:#000000; --safe-surface:#000000; --safe-card:#000000; --safe-text:#ffffff; --safe-muted:#ffffff; --safe-border:#ffffff; --safe-soft:#111111; }
+        """
+    elif color_scheme == "Light":
+        theme_css = """
+        :root { --safe-bg:#ffffff; --safe-surface:#f8fafc; --safe-card:#ffffff; --safe-text:#111827; --safe-muted:#4b5563; --safe-border:#d1d5db; --safe-soft:#f1f5f9; }
         """
     else:
         theme_css = """
@@ -922,6 +928,7 @@ def show_room_id_selection_page() -> None:
         st.warning("Database saving is disabled, so this check will not be attached to a Room ID.")
         if st.button("Continue Without Room ID →", type="primary"):
             st.session_state["current_room_id"] = None
+            st.session_state["current_home_room_id"] = None
             go_to_page("photo_upload")
         return
 
@@ -931,6 +938,7 @@ def show_room_id_selection_page() -> None:
         show_home_id_login_box(key_prefix="room_id_page_home")
         if st.button("Continue Without Database Room Tracking"):
             st.session_state["current_room_id"] = None
+            st.session_state["current_home_room_id"] = None
             go_to_page("photo_upload")
         return
 
@@ -945,6 +953,7 @@ def show_room_id_selection_page() -> None:
             st.code(str(error))
         if st.button("Continue Without Room ID"):
             st.session_state["current_room_id"] = None
+            st.session_state["current_home_room_id"] = None
             go_to_page("photo_upload")
         return
 
@@ -1014,6 +1023,7 @@ def show_photo_upload_page() -> None:
         image = Image.open(uploaded_file)
         st.image(image, caption=f"Preview of uploaded {room_type} photo", use_container_width=True)
         uploaded_file.seek(0)
+        st.session_state["photo_uploaded"] = True
         st.success("Photo uploaded successfully.")
 
         if st.button("Analyze Photo →", type="primary"):
@@ -1024,6 +1034,7 @@ def show_photo_upload_page() -> None:
                 st.session_state["ai_result"] = ai_result
             go_to_page("ai_results")
     else:
+        st.session_state["photo_uploaded"] = False
         st.info("Upload a JPG, JPEG, PNG, or WEBP photo smaller than 5 MB.")
 
     if st.button("← Back"):

@@ -147,6 +147,9 @@ def home_id_exists(home_id: str) -> bool:
 def is_home_id_available(home_id: str) -> bool:
     """Returns True if a Home ID is valid and not already taken."""
 
+    if not is_database_enabled():
+        return False
+
     normalized_home_id = validate_home_id_or_raise(home_id)
     return not home_id_exists(normalized_home_id)
 
@@ -258,6 +261,36 @@ def room_id_exists(home_id: str, room_id: str) -> bool:
     return bool(response.data)
 
 
+def get_home_room(home_id: str, room_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Gets one room row under one Home ID.
+
+    This is used before saving a room check so the database does not attach
+    a check to a Room ID that was never created.
+    """
+
+    if not is_database_enabled():
+        return None
+
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    normalized_room_id = validate_room_id_or_raise(room_id)
+    client = get_supabase_client()
+
+    response = (
+        client.table("home_rooms")
+        .select("*")
+        .eq("home_id", normalized_home_id)
+        .eq("room_id", normalized_room_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not response.data:
+        return None
+
+    return response.data[0]
+
+
 def create_home_room(
     home_id: str,
     room_id: str,
@@ -360,6 +393,7 @@ def build_room_check_payload(
     using_demo_sample: bool = False,
     demo_sample_name: Optional[str] = None,
     room_id: Optional[str] = None,
+    home_room_id: Optional[str] = None,
 ) -> Dict[str, Any]:
     """Creates the main row for room_checks. This payload must stay anonymous."""
 
@@ -368,6 +402,7 @@ def build_room_check_payload(
     return {
         "home_id": validate_home_id_or_raise(home_id),
         "room_id": validate_room_id_or_raise(room_id) if room_id else None,
+        "home_room_id": home_room_id,
         "app_version": get_app_version(),
         "ai_mode": get_ai_mode(),
         "room_type": room_type,
@@ -483,10 +518,24 @@ def save_room_check(
     if not confirmed_ok:
         raise RuntimeError(error_message)
 
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    normalized_room_id = validate_room_id_or_raise(room_id) if room_id else None
+    home_room_id = None
+
+    if normalized_room_id:
+        home_room = get_home_room(normalized_home_id, normalized_room_id)
+
+        if not home_room:
+            raise RuntimeError(
+                "Room ID does not exist under this Home ID. Create or choose the room before saving."
+            )
+
+        home_room_id = home_room.get("id")
+
     client = get_supabase_client()
 
     room_check_payload = build_room_check_payload(
-        home_id=home_id,
+        home_id=normalized_home_id,
         room_type=room_type,
         score=score,
         risk_level=risk_level,
@@ -496,7 +545,8 @@ def save_room_check(
         safety_confirmed=safety_confirmed,
         using_demo_sample=using_demo_sample,
         demo_sample_name=demo_sample_name,
-        room_id=room_id,
+        room_id=normalized_room_id,
+        home_room_id=home_room_id,
     )
 
     room_response = client.table("room_checks").insert(room_check_payload).execute()
