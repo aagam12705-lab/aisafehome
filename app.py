@@ -677,11 +677,19 @@ def show_ai_results_page() -> None:
     else:
         st.info("No possible hazards were listed by AI.")
 
-    with st.expander("AI could not confirm"):
-        for item in ai_result.get("not_visible", []):
-            st.write(f"- {item}")
+    not_visible = ai_result.get("not_visible", [])
 
-    st.warning(ai_result.get("safety_reminder", "AI may miss hazards. Human review is recommended."))
+    if not_visible:
+        with st.expander("AI could not confirm"):
+            for item in not_visible:
+                st.write(f"- {item}")
+
+    st.warning(
+        ai_result.get(
+            "safety_reminder",
+            "AI may miss hazards. Human review is recommended.",
+        )
+    )
 
     if st.button("Continue to Checklist →", type="primary"):
         reset_checklist_progress()

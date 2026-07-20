@@ -359,29 +359,58 @@ def show_current_home_and_room_status() -> None:
 
 
 def render_hazard_card(hazard: Dict[str, Any], number: int) -> None:
+    """
+    Displays one hazard as a styled card.
+
+    Important:
+    - This function renders the card directly.
+    - Do not wrap this function in st.write().
+    - Do not return the HTML string.
+    """
+
     category = hazard.get("category", "unclear")
     category_label = get_category_label(category)
 
     priority = hazard.get("priority") or get_priority_for_hazard(hazard)
     priority_class = get_priority_css_class(priority)
 
-    st.markdown(
-        f"""
-        <div class="hazard-card">
-            <div class="hazard-number">Hazard {number}</div>
-            <div class="hazard-title">{safe_text(hazard.get("title", "Possible hazard"))}</div>
-            <div class="hazard-category">{safe_text(category_label)}</div>
-            <div class="priority-badge {priority_class}">{safe_text(priority)}</div>
-
-            <div class="hazard-section-label">Why it matters</div>
-            <p>{safe_text(hazard.get("explanation", "This area may need human review."))}</p>
-
-            <div class="hazard-section-label">Suggested fix</div>
-            <p>{safe_text(hazard.get("recommendation", "Review this area carefully."))}</p>
-        </div>
-        """,
-        unsafe_allow_html=True,
+    title = safe_text(hazard.get("title", "Possible hazard"))
+    explanation = safe_text(
+        hazard.get("explanation", "This area may need human review.")
     )
+    recommendation = safe_text(
+        hazard.get("recommendation", "Review this area carefully.")
+    )
+
+    card_html = f"""
+    <div class="hazard-card">
+        <div class="hazard-number">Hazard {number}</div>
+
+        <div class="hazard-title">
+            {title}
+        </div>
+
+        <div class="hazard-category">
+            {safe_text(category_label)}
+        </div>
+
+        <div class="priority-badge {safe_text(priority_class)}">
+            {safe_text(priority)}
+        </div>
+
+        <div class="hazard-section-label">
+            Why it matters
+        </div>
+        <p>{explanation}</p>
+
+        <div class="hazard-section-label">
+            Suggested fix
+        </div>
+        <p>{recommendation}</p>
+    </div>
+    """
+
+    st.markdown(card_html, unsafe_allow_html=True)
 
 
 def show_score_explanation_card(score_breakdown: Dict[str, Any]) -> None:
