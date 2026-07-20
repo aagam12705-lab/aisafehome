@@ -1261,6 +1261,7 @@ def show_ai_results_page() -> None:
         go_to_page("photo_upload")
 
 
+
 def save_checklist_answer(question: Dict[str, Any], answer_label: str) -> None:
     st.session_state["checklist_answers_by_id"][question["id"]] = {
         "id": question["id"],
