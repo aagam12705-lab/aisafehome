@@ -4,12 +4,6 @@ email_service.py
 Privacy-safe server-side email sending for AI SafeHome.
 
 Uses Brevo transactional email API.
-
-Rules:
-- Do not store recipient emails.
-- Do not attach uploaded photos.
-- Do not send names, addresses, medical history, medication lists, faces,
-  mail, bills, medication bottles, or medical documents.
 """
 
 import os
@@ -19,19 +13,12 @@ from typing import Optional
 import requests
 from dotenv import load_dotenv
 
-
 load_dotenv()
-
 
 BREVO_SEND_EMAIL_URL = "https://api.brevo.com/v3/smtp/email"
 
 
 def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
-    """
-    Reads local .env values first.
-    Also supports Streamlit Cloud secrets.
-    """
-
     value = os.getenv(name)
 
     if value is not None and value != "":
@@ -45,7 +32,6 @@ def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
 
             if secret_value is not None and secret_value != "":
                 return str(secret_value)
-
     except Exception:
         pass
 
@@ -53,46 +39,25 @@ def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
 
 
 def is_email_enabled() -> bool:
-    """
-    Returns True if server-side email is enabled.
-    """
-
     value = get_env_value("EMAIL_ENABLED", "false")
     return str(value).lower().strip() == "true"
 
 
 def get_email_status_message() -> str:
-    """
-    Safe email status message.
-    Never exposes API keys.
-    """
-
     if is_email_enabled():
         return "Server-side email is enabled."
-
     return "Server-side email is disabled."
 
 
 def is_valid_email_address(email: str) -> bool:
-    """
-    Basic email format check.
-
-    This is not perfect, but it catches obvious mistakes.
-    """
-
     if not email:
         return False
 
     pattern = r"^[^@\s]+@[^@\s]+\.[^@\s]+$"
-
     return re.match(pattern, email.strip()) is not None
 
 
 def get_brevo_settings() -> dict:
-    """
-    Loads Brevo settings from .env or Streamlit secrets.
-    """
-
     api_key = get_env_value("BREVO_API_KEY")
     sender_email = get_env_value("BREVO_SENDER_EMAIL")
     sender_name = get_env_value("BREVO_SENDER_NAME", "AI SafeHome")
@@ -111,10 +76,6 @@ def get_brevo_settings() -> dict:
 
 
 def build_html_email_body(text_body: str) -> str:
-    """
-    Converts plain text into simple safe HTML.
-    """
-
     escaped = (
         str(text_body)
         .replace("&", "&amp;")
@@ -140,12 +101,6 @@ def send_summary_email(
     subject: str,
     text_body: str,
 ) -> str:
-    """
-    Sends one server-side summary email using Brevo.
-
-    Returns Brevo message id if available.
-    """
-
     if not is_email_enabled():
         raise RuntimeError("Server-side email is disabled.")
 
@@ -196,5 +151,4 @@ def send_summary_email(
         )
 
     data = response.json()
-
     return str(data.get("messageId", "sent"))

@@ -1,3 +1,12 @@
+"""
+database.py
+
+Supabase database helpers for AI SafeHome.
+
+Stores anonymous room-check results only.
+Does not store uploaded photos, names, addresses, medical history, or medication data.
+"""
+
 import os
 import re
 from typing import Any, Dict, List, Optional, Tuple, Union
@@ -8,11 +17,6 @@ load_dotenv()
 
 
 def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
-    """
-    Reads a setting from environment variables first.
-    If running inside Streamlit, also checks st.secrets.
-    """
-
     value = os.getenv(name)
 
     if value is not None and value != "":
@@ -32,23 +36,16 @@ def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
 
 
 def is_database_enabled() -> bool:
-    """Returns True when database saving/viewing is enabled."""
-
-    value = get_env_value("DATABASE_ENABLED", "false")
-    return str(value).lower().strip() == "true"
+    return str(get_env_value("DATABASE_ENABLED", "false")).lower().strip() == "true"
 
 
 def get_database_status_message() -> str:
-    """Returns a safe status message. Never exposes secrets."""
-
     if is_database_enabled():
         return "Database saving is enabled."
     return "Database saving is disabled."
 
 
 def get_ai_mode() -> str:
-    """Returns the AI mode in a database-safe format."""
-
     mode = str(get_env_value("AI_ANALYSIS_MODE", "fake")).lower().strip()
     if mode in ["fake", "real", "demo"]:
         return mode
@@ -56,17 +53,10 @@ def get_ai_mode() -> str:
 
 
 def get_app_version() -> str:
-    """Returns the app version stored with saved rows."""
-
     return str(get_env_value("APP_VERSION", "1.0")).strip()
 
 
 def get_supabase_client():
-    """
-    Creates and returns a Supabase client.
-    Import is lazy so the app can still run with the database disabled.
-    """
-
     if not is_database_enabled():
         raise RuntimeError("Database saving is disabled.")
 
@@ -90,32 +80,23 @@ def get_supabase_client():
 
 
 # -----------------------------------------------------------------------------
-# Home ID helpers
+# Home IDs
 # -----------------------------------------------------------------------------
 
 
 def normalize_home_id(home_id: Optional[str]) -> str:
-    """Cleans a Home ID for lookup and saving."""
-
     if not home_id:
         return ""
     return str(home_id).strip().upper()
 
 
 def is_valid_home_id(home_id: Optional[str]) -> bool:
-    """
-    Checks whether a Home ID has a safe anonymous format.
-    Example: HOME-8K2M-Q9PA-W4ZT
-    """
-
     normalized = normalize_home_id(home_id)
     pattern = r"^HOME-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$"
     return re.match(pattern, normalized) is not None
 
 
 def validate_home_id_or_raise(home_id: Optional[str]) -> str:
-    """Returns normalized Home ID or raises a clear error."""
-
     normalized = normalize_home_id(home_id)
 
     if not is_valid_home_id(normalized):
@@ -125,8 +106,6 @@ def validate_home_id_or_raise(home_id: Optional[str]) -> str:
 
 
 def home_id_exists(home_id: str) -> bool:
-    """Checks whether a Home ID exists in the homes table."""
-
     if not is_database_enabled():
         return False
 
@@ -145,8 +124,6 @@ def home_id_exists(home_id: str) -> bool:
 
 
 def is_home_id_available(home_id: str) -> bool:
-    """Returns True if a Home ID is valid and not already taken."""
-
     if not is_database_enabled():
         return False
 
@@ -155,8 +132,6 @@ def is_home_id_available(home_id: str) -> bool:
 
 
 def create_home_id(home_id: str) -> str:
-    """Creates/reserves a new anonymous Home ID."""
-
     if not is_database_enabled():
         raise RuntimeError("Database saving is disabled.")
 
@@ -175,16 +150,11 @@ def create_home_id(home_id: str) -> str:
 
 
 # -----------------------------------------------------------------------------
-# Room ID helpers
+# Room IDs
 # -----------------------------------------------------------------------------
 
 
 def normalize_room_id(room_id: Optional[str]) -> str:
-    """
-    Cleans a Room ID.
-    Examples: Bedroom 1 -> BEDROOM-1, bathroom_2 -> BATHROOM-2
-    """
-
     if not room_id:
         return ""
 
@@ -192,20 +162,17 @@ def normalize_room_id(room_id: Optional[str]) -> str:
     cleaned = cleaned.replace(" ", "-").replace("_", "-")
     cleaned = re.sub(r"[^A-Z0-9-]", "", cleaned)
     cleaned = re.sub(r"-+", "-", cleaned).strip("-")
+
     return cleaned
 
 
 def is_valid_room_id(room_id: Optional[str]) -> bool:
-    """Checks whether a Room ID is safe to store."""
-
     normalized = normalize_room_id(room_id)
     pattern = r"^[A-Z0-9-]{2,40}$"
     return re.match(pattern, normalized) is not None
 
 
 def validate_room_id_or_raise(room_id: Optional[str]) -> str:
-    """Returns a normalized Room ID or raises a clear error."""
-
     normalized = normalize_room_id(room_id)
 
     if not is_valid_room_id(normalized):
@@ -216,9 +183,10 @@ def validate_room_id_or_raise(room_id: Optional[str]) -> str:
     return normalized
 
 
-def fetch_rooms_for_home(home_id: str, room_type: Optional[str] = None) -> List[Dict[str, Any]]:
-    """Fetches rooms under one Home ID. Optionally filters by room type."""
-
+def fetch_rooms_for_home(
+    home_id: str,
+    room_type: Optional[str] = None,
+) -> List[Dict[str, Any]]:
     if not is_database_enabled():
         return []
 
@@ -240,8 +208,6 @@ def fetch_rooms_for_home(home_id: str, room_type: Optional[str] = None) -> List[
 
 
 def room_id_exists(home_id: str, room_id: str) -> bool:
-    """Checks whether a Room ID already exists under one Home ID."""
-
     if not is_database_enabled():
         return False
 
@@ -262,13 +228,6 @@ def room_id_exists(home_id: str, room_id: str) -> bool:
 
 
 def get_home_room(home_id: str, room_id: str) -> Optional[Dict[str, Any]]:
-    """
-    Gets one room row under one Home ID.
-
-    This is used before saving a room check so the database does not attach
-    a check to a Room ID that was never created.
-    """
-
     if not is_database_enabled():
         return None
 
@@ -297,8 +256,6 @@ def create_home_room(
     room_type: str,
     room_display_name: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Creates one anonymous room under one Home ID."""
-
     normalized_home_id = validate_home_id_or_raise(home_id)
     normalized_room_id = validate_room_id_or_raise(room_id)
 
@@ -326,28 +283,26 @@ def create_home_room(
 
 
 def get_next_room_id(home_id: str, room_type: str) -> str:
-    """Suggests the next Room ID for a selected room type."""
-
     existing_rooms = fetch_rooms_for_home(home_id=home_id, room_type=room_type)
-    base = normalize_room_id(room_type) or "ROOM"
 
+    base = normalize_room_id(room_type) or "ROOM"
     number = len(existing_rooms) + 1
 
     while True:
         candidate = f"{base}-{number}"
+
         if not room_id_exists(home_id, candidate):
             return candidate
+
         number += 1
 
 
 # -----------------------------------------------------------------------------
-# Save payload helpers
+# Save helpers
 # -----------------------------------------------------------------------------
 
 
 def validate_anonymous_save_confirmation(confirmed: bool) -> Tuple[bool, str]:
-    """Checks whether the user confirmed anonymous/privacy-safe saving."""
-
     if confirmed:
         return True, ""
 
@@ -358,8 +313,6 @@ def validate_anonymous_save_confirmation(confirmed: bool) -> Tuple[bool, str]:
 
 
 def count_checklist_answers(checklist_answers: List[Dict[str, Any]]) -> Dict[str, int]:
-    """Counts checklist answer types."""
-
     counts = {
         "yes": 0,
         "no": 0,
@@ -395,8 +348,6 @@ def build_room_check_payload(
     room_id: Optional[str] = None,
     home_room_id: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Creates the main row for room_checks. This payload must stay anonymous."""
-
     checklist_counts = count_checklist_answers(checklist_answers)
 
     return {
@@ -419,9 +370,10 @@ def build_room_check_payload(
     }
 
 
-def build_hazard_detail_row(room_check_id: str, hazard: Dict[str, Any]) -> Dict[str, Any]:
-    """Creates one ai_hazard row for room_check_details."""
-
+def build_hazard_detail_row(
+    room_check_id: str,
+    hazard: Dict[str, Any],
+) -> Dict[str, Any]:
     return {
         "room_check_id": room_check_id,
         "detail_type": "ai_hazard",
@@ -435,9 +387,10 @@ def build_hazard_detail_row(room_check_id: str, hazard: Dict[str, Any]) -> Dict[
     }
 
 
-def build_checklist_detail_row(room_check_id: str, answer: Dict[str, Any]) -> Dict[str, Any]:
-    """Creates one checklist_answer row for room_check_details."""
-
+def build_checklist_detail_row(
+    room_check_id: str,
+    answer: Dict[str, Any],
+) -> Dict[str, Any]:
     return {
         "room_check_id": room_check_id,
         "detail_type": "checklist_answer",
@@ -451,22 +404,25 @@ def build_checklist_detail_row(room_check_id: str, answer: Dict[str, Any]) -> Di
     }
 
 
-def build_fix_detail_row(room_check_id: str, fix: Union[Dict[str, Any], str]) -> Dict[str, Any]:
-    """Creates one recommended_fix row for room_check_details."""
-
+def build_fix_detail_row(
+    room_check_id: str,
+    fix: Union[Dict[str, Any], str],
+) -> Dict[str, Any]:
     if isinstance(fix, dict):
         recommendation = fix.get("text")
         priority = fix.get("priority")
         title = fix.get("source")
+        category = fix.get("category")
     else:
         recommendation = str(fix)
         priority = None
         title = None
+        category = None
 
     return {
         "room_check_id": room_check_id,
         "detail_type": "recommended_fix",
-        "category": None,
+        "category": category,
         "title": title,
         "explanation": None,
         "recommendation": recommendation,
@@ -482,8 +438,6 @@ def build_detail_rows(
     checklist_answers: List[Dict[str, Any]],
     recommended_fixes: List[Union[Dict[str, Any], str]],
 ) -> List[Dict[str, Any]]:
-    """Creates all room_check_details rows for one saved room check."""
-
     detail_rows = []
 
     for hazard in hazards:
@@ -512,9 +466,8 @@ def save_room_check(
     demo_sample_name: Optional[str] = None,
     room_id: Optional[str] = None,
 ) -> str:
-    """Saves one anonymous room check and its details. Returns saved check ID."""
-
     confirmed_ok, error_message = validate_anonymous_save_confirmation(safety_confirmed)
+
     if not confirmed_ok:
         raise RuntimeError(error_message)
 
@@ -570,13 +523,14 @@ def save_room_check(
 
 
 # -----------------------------------------------------------------------------
-# Fetch checks and details
+# Fetch checks and stats
 # -----------------------------------------------------------------------------
 
 
-def fetch_room_checks_by_home_id(home_id: str, limit: int = 50) -> List[Dict[str, Any]]:
-    """Fetches saved checks for one Home ID only."""
-
+def fetch_room_checks_by_home_id(
+    home_id: str,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
     if not is_database_enabled():
         return []
 
@@ -595,9 +549,11 @@ def fetch_room_checks_by_home_id(home_id: str, limit: int = 50) -> List[Dict[str
     return response.data or []
 
 
-def fetch_room_checks_by_room_id(home_id: str, room_id: str, limit: int = 100) -> List[Dict[str, Any]]:
-    """Fetches saved checks for one Home ID and one Room ID."""
-
+def fetch_room_checks_by_room_id(
+    home_id: str,
+    room_id: str,
+    limit: int = 100,
+) -> List[Dict[str, Any]]:
     if not is_database_enabled():
         return []
 
@@ -618,9 +574,10 @@ def fetch_room_checks_by_room_id(home_id: str, room_id: str, limit: int = 100) -
     return response.data or []
 
 
-def fetch_room_check_by_id(check_id: str, home_id: str) -> Optional[Dict[str, Any]]:
-    """Fetches one saved room check by Check ID and Home ID."""
-
+def fetch_room_check_by_id(
+    check_id: str,
+    home_id: str,
+) -> Optional[Dict[str, Any]]:
     if not is_database_enabled():
         return None
 
@@ -643,8 +600,6 @@ def fetch_room_check_by_id(check_id: str, home_id: str) -> Optional[Dict[str, An
 
 
 def fetch_room_check_details(room_check_id: str) -> List[Dict[str, Any]]:
-    """Fetches detail rows for one saved room check."""
-
     if not is_database_enabled():
         return []
 
@@ -662,22 +617,15 @@ def fetch_room_check_details(room_check_id: str) -> List[Dict[str, Any]]:
 
 
 def fetch_room_details_for_checks(room_check_ids: List[str]) -> List[Dict[str, Any]]:
-    """Fetches detail rows for multiple saved room checks."""
-
     detail_rows = []
+
     for room_check_id in room_check_ids:
         detail_rows.extend(fetch_room_check_details(room_check_id))
+
     return detail_rows
 
 
-# -----------------------------------------------------------------------------
-# Stats
-# -----------------------------------------------------------------------------
-
-
 def fetch_summary_stats_for_home(home_id: str) -> Dict[str, Any]:
-    """Returns summary stats for one Home ID only."""
-
     rows = fetch_room_checks_by_home_id(home_id=home_id, limit=500)
 
     if not rows:
@@ -698,7 +646,8 @@ def fetch_summary_stats_for_home(home_id: str) -> Dict[str, Any]:
     moderate_risk_count = sum(1 for row in rows if row.get("risk_level") == "Moderate Risk")
     low_risk_count = sum(1 for row in rows if row.get("risk_level") == "Low Risk")
 
-    room_counts = {}
+    room_counts: Dict[str, int] = {}
+
     for row in rows:
         room_type = row.get("room_type", "Unknown")
         room_counts[room_type] = room_counts.get(room_type, 0) + 1
@@ -721,8 +670,6 @@ def build_room_stats_record(
     check_rows: List[Dict[str, Any]],
     detail_rows: List[Dict[str, Any]],
 ) -> Dict[str, Any]:
-    """Builds one room stats record from room info, saved checks, and details."""
-
     room_id = room_info.get("room_id")
     room_type = room_info.get("room_type", "Unknown Room")
     room_display_name = room_info.get("room_display_name") or room_id
@@ -762,9 +709,11 @@ def build_room_stats_record(
         if detail_type == "ai_hazard":
             category = detail.get("category") or "unclear"
             hazard_counts[category] = hazard_counts.get(category, 0) + 1
+
         elif detail_type == "checklist_answer":
             answer = detail.get("checklist_answer") or "Unknown"
             checklist_answer_counts[answer] = checklist_answer_counts.get(answer, 0) + 1
+
         elif detail_type == "recommended_fix":
             recommended_fix_count += 1
 
@@ -792,14 +741,13 @@ def build_room_stats_record(
 
 
 def fetch_room_stats(home_id: str, room_id: str) -> Dict[str, Any]:
-    """Gets stats for one Room ID under one Home ID."""
-
     normalized_home_id = validate_home_id_or_raise(home_id)
     normalized_room_id = validate_room_id_or_raise(room_id)
 
     rooms = fetch_rooms_for_home(home_id=normalized_home_id)
 
     matching_room = None
+
     for room in rooms:
         if room.get("room_id") == normalized_room_id:
             matching_room = room
@@ -829,9 +777,8 @@ def fetch_room_stats(home_id: str, room_id: str) -> Dict[str, Any]:
 
 
 def fetch_all_room_stats_for_home(home_id: str) -> List[Dict[str, Any]]:
-    """Gets stats for every room under one Home ID."""
-
     normalized_home_id = validate_home_id_or_raise(home_id)
+
     rooms = fetch_rooms_for_home(home_id=normalized_home_id)
     all_checks = fetch_room_checks_by_home_id(home_id=normalized_home_id, limit=500)
 
@@ -839,12 +786,13 @@ def fetch_all_room_stats_for_home(home_id: str) -> List[Dict[str, Any]]:
 
     for room in rooms:
         room_id = room.get("room_id")
+
         if room_id:
             rooms_by_id[room_id] = room
 
-    # Include rooms that have checks but may not exist in home_rooms because of older data.
     for check in all_checks:
         room_id = check.get("room_id")
+
         if room_id and room_id not in rooms_by_id:
             rooms_by_id[room_id] = {
                 "room_id": room_id,
@@ -867,4 +815,10 @@ def fetch_all_room_stats_for_home(home_id: str) -> List[Dict[str, Any]]:
             )
         )
 
-    return sorted(stats, key=lambda item: (item.get("room_type", ""), item.get("room_id", "")))
+    return sorted(
+        stats,
+        key=lambda item: (
+            item.get("room_type", ""),
+            item.get("room_id", ""),
+        ),
+    )

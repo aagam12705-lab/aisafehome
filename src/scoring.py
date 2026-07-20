@@ -1,152 +1,95 @@
-"""
-scoring.py
+from typing import Any, Dict, List
 
-This file contains the AI SafeHome fall-hazard scoring algorithm.
-
-Important:
-This score is not a medical diagnosis.
-It is a simple educational home-safety hazard score.
-"""
-
-HAZARD_POINTS = {
-    "loose_rug": 10,
-    "cords": 12,
-    "clutter": 10,
-    "poor_lighting": 8,
-    "slippery_floor": 12,
-    "narrow_pathway": 8,
-    "stairs": 15,
-    "handrail": 15,
-    "bathroom_grab_bars": 15,
-    "hard_to_reach_items": 6,
-
-    # Expanded hazard categories
-    "threshold_trip": 10,
-    "unstable_furniture": 10,
-    "pet_items": 6,
-    "footwear": 6,
-    "low_seating": 8,
-    "poor_contrast": 6,
-    "uneven_floor": 12,
-    "door_mat": 8,
-    "furniture_in_path": 8,
-    "outdoor_surface": 12,
-    "laundry_on_floor": 8,
-    "open_drawers_cabinets": 8,
-}
+from src.constants import HAZARD_POINTS
 
 
+def get_points_for_category(category: str | None) -> float:
+    return float(HAZARD_POINTS.get(category or "unclear", 0))
 
 
-def get_checklist_answer_points(answer):
-    """
-    Returns the points added by one checklist answer.
-    """
-
-    category = answer.get("category")
-    response = answer.get("answer")
-    points = HAZARD_POINTS.get(category, 0)
-
-    if response == "yes":
-        return points
-
-    if response == "not_sure":
-        return points * 0.5
-
-    return 0
-
-
-
-def calculate_score(ai_hazards, checklist_answers):
-    """
-    Combines AI hazards and checklist answers into a basic 0-100 score.
-
-    AI hazards:
-    - Each AI hazard adds its hazard point value.
-
-    Checklist answers:
-    - Yes = full points
-    - Not sure = half points
-    - No = 0 points
-    - Not applicable = 0 points
-    - Skipped = 0 points
-    """
-
-    score = 0
+def calculate_ai_points(ai_hazards: List[Dict[str, Any]]) -> float:
+    total = 0.0
 
     for hazard in ai_hazards:
-        category = hazard.get("category")
-        score += HAZARD_POINTS.get(category, 0)
+        total += get_points_for_category(hazard.get("category"))
+
+    return total
+
+
+def calculate_checklist_points(checklist_answers: List[Dict[str, Any]]) -> float:
+    total = 0.0
 
     for answer in checklist_answers:
-        score += get_checklist_answer_points(answer)
+        points = get_points_for_category(answer.get("category"))
+        response = answer.get("answer")
 
-    return min(round(score), 100)
+        if response == "yes":
+            total += points
+        elif response == "not_sure":
+            total += points * 0.5
+
+    return total
 
 
+def cap_score(raw_score: float) -> int:
+    return min(round(raw_score), 100)
 
-def get_risk_level(score):
-    """
-    Converts the numeric score into a simple risk label.
-    """
 
+def get_risk_level(score: int) -> str:
     if score < 30:
         return "Low Risk"
-    elif score < 60:
+
+    if score < 60:
         return "Moderate Risk"
-    else:
-        return "High Risk"
+
+    return "High Risk"
 
 
-def get_score_breakdown(ai_hazards, checklist_answers):
-    """
-    Creates a detailed score breakdown for display.
-    """
+def calculate_score(
+    ai_hazards: List[Dict[str, Any]],
+    checklist_answers: List[Dict[str, Any]],
+) -> int:
+    raw_score = calculate_ai_points(ai_hazards) + calculate_checklist_points(checklist_answers)
+    return cap_score(raw_score)
 
-    ai_points = 0
-    checklist_points = 0
-    ai_items = []
-    checklist_items = []
 
-    for hazard in ai_hazards:
-        category = hazard.get("category")
-        points = HAZARD_POINTS.get(category, 0)
-        ai_points += points
-
-        if points > 0:
-            ai_items.append(
-                {
-                    "source": "AI photo result",
-                    "category": category,
-                    "title": hazard.get("title", "Possible hazard"),
-                    "points": points,
-                }
-            )
-
-    for answer in checklist_answers:
-        category = answer.get("category")
-        points = get_checklist_answer_points(answer)
-        checklist_points += points
-
-        if points > 0:
-            checklist_items.append(
-                {
-                    "source": "Checklist",
-                    "category": category,
-                    "question": answer.get("question", "Checklist item"),
-                    "answer_label": answer.get("answer_label", answer.get("answer")),
-                    "points": points,
-                }
-            )
-
-    total_before_cap = ai_points + checklist_points
-    final_score = min(round(total_before_cap), 100)
+def get_score_breakdown(
+    ai_hazards: List[Dict[str, Any]],
+    checklist_answers: List[Dict[str, Any]],
+) -> Dict[str, Any]:
+    ai_points = calculate_ai_points(ai_hazards)
+    checklist_points = calculate_checklist_points(checklist_answers)
+    raw_score = ai_points + checklist_points
+    final_score = cap_score(raw_score)
 
     return {
         "ai_points": round(ai_points, 1),
         "checklist_points": round(checklist_points, 1),
-        "total_before_cap": round(total_before_cap, 1),
+        "raw_score": round(raw_score, 1),
+        "total_before_cap": round(raw_score, 1),
         "final_score": final_score,
-        "ai_items": ai_items,
-        "checklist_items": checklist_items,
+        "risk_level": get_risk_level(final_score),
+        "capped_points": max(0, round(raw_score - final_score, 1)),
+        "explanation": (
+            "Higher score means more possible fall hazards. "
+            "The score combines AI-detected hazards and checklist concerns, then caps at 100."
+        ),
     }
+
+
+def format_score_explanation(score_breakdown: Dict[str, Any]) -> str:
+    if not score_breakdown:
+        return "No score breakdown is available yet."
+
+    return f"""
+Why this score?
+
+AI hazard points: {score_breakdown.get("ai_points", 0)}
+Checklist concern points: {score_breakdown.get("checklist_points", 0)}
+Raw score before cap: {score_breakdown.get("raw_score", score_breakdown.get("total_before_cap", 0))}
+Final score: {score_breakdown.get("final_score", 0)}/100
+Risk label: {score_breakdown.get("risk_level", "Unknown")}
+
+Higher score = more possible fall hazards.
+Lower score = fewer possible fall hazards.
+""".strip()

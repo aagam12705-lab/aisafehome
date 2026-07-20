@@ -1,15 +1,4 @@
-"""
-constants.py
-
-Shared constants for AI SafeHome.
-
-This file should not import Streamlit.
-It should only store fixed app text, room lists, category labels,
-scoring points, recommendations, and priority rules.
-"""
-
 APP_NAME = "AI SafeHome"
-
 TAGLINE = "Find home fall hazards before they become accidents."
 
 LANDING_EXPLANATION = (
@@ -57,7 +46,6 @@ ROOM_OPTIONS = [
 ]
 
 ALLOWED_FILE_TYPES = ["jpg", "jpeg", "png", "webp"]
-
 MAX_FILE_SIZE_MB = 5
 
 CATEGORY_LABELS = {
@@ -150,6 +138,7 @@ CATEGORY_PRIORITY = {
     "uneven_floor": PRIORITY_FIX_NOW,
     "outdoor_surface": PRIORITY_FIX_NOW,
     "open_drawers_cabinets": PRIORITY_FIX_NOW,
+
     "loose_rug": PRIORITY_FIX_SOON,
     "clutter": PRIORITY_FIX_SOON,
     "narrow_pathway": PRIORITY_FIX_SOON,
@@ -161,6 +150,7 @@ CATEGORY_PRIORITY = {
     "laundry_on_floor": PRIORITY_FIX_SOON,
     "low_seating": PRIORITY_FIX_SOON,
     "poor_contrast": PRIORITY_FIX_SOON,
+
     "pet_items": PRIORITY_WATCH_REVIEW,
     "footwear": PRIORITY_WATCH_REVIEW,
     "unclear": PRIORITY_WATCH_REVIEW,

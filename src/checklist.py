@@ -1,11 +1,11 @@
-"""
-checklist.py
+ANSWER_OPTIONS = ["Yes", "No", "Not sure", "Not applicable"]
 
-This file stores the manual safety checklist questions.
-
-The checklist is important because AI may miss hazards.
-The user reviews the room and answers simple questions.
-"""
+ANSWER_VALUE_MAP = {
+    "Yes": "yes",
+    "No": "no",
+    "Not sure": "not_sure",
+    "Not applicable": "not_applicable",
+}
 
 CHECKLIST_QUESTIONS = [
     {
@@ -58,17 +58,15 @@ CHECKLIST_QUESTIONS = [
         "category": "hard_to_reach_items",
         "text": "Are commonly used items hard to reach?",
     },
-
-    # New checklist questions
     {
         "id": "threshold_trip",
         "category": "threshold_trip",
-        "text": "Are there raised thresholds or floor transitions that could catch someone's foot?",
+        "text": "Are there raised thresholds or floor transitions?",
     },
     {
         "id": "unstable_furniture",
         "category": "unstable_furniture",
-        "text": "Is there furniture that looks unstable, wobbly, or easy to bump into?",
+        "text": "Is there furniture that slides, wobbles, or may be used for unsafe support?",
     },
     {
         "id": "pet_items",
@@ -78,62 +76,46 @@ CHECKLIST_QUESTIONS = [
     {
         "id": "footwear",
         "category": "footwear",
-        "text": "Are shoes, slippers, or sandals left in the walking path?",
+        "text": "Are shoes or slippers left in walking paths?",
     },
     {
         "id": "low_seating",
         "category": "low_seating",
-        "text": "Is there very low seating that may be hard to sit in or stand up from?",
+        "text": "Are chairs or seats very low or difficult to stand up from?",
     },
     {
         "id": "poor_contrast",
         "category": "poor_contrast",
-        "text": "Are step edges, thresholds, or floor changes hard to see?",
+        "text": "Are step edges or floor changes hard to see?",
     },
     {
         "id": "uneven_floor",
         "category": "uneven_floor",
-        "text": "Are there uneven floor areas, lifted edges, bumps, or damaged flooring?",
+        "text": "Are there uneven floor areas, lifted edges, cracks, or bumps?",
     },
     {
         "id": "door_mat",
         "category": "door_mat",
-        "text": "Is there a loose door mat near an entrance?",
+        "text": "Are there loose door mats or entry mats?",
     },
     {
         "id": "furniture_in_path",
         "category": "furniture_in_path",
-        "text": "Is furniture blocking or narrowing the walking path?",
+        "text": "Is furniture blocking the walking path?",
     },
     {
         "id": "outdoor_surface",
         "category": "outdoor_surface",
-        "text": "Are outdoor walking areas wet, icy, uneven, leafy, or blocked?",
+        "text": "Are outdoor walking areas wet, uneven, icy, cluttered, or poorly lit?",
     },
     {
         "id": "laundry_on_floor",
         "category": "laundry_on_floor",
-        "text": "Is laundry, clothing, or a laundry basket on the floor?",
+        "text": "Is laundry or loose clothing on the floor?",
     },
     {
         "id": "open_drawers_cabinets",
         "category": "open_drawers_cabinets",
-        "text": "Are drawers, cabinet doors, or appliance doors left open into the walking path?",
+        "text": "Are drawers or cabinet doors open into the walking path?",
     },
 ]
-
-
-ANSWER_OPTIONS = [
-    "No",
-    "Yes",
-    "Not sure",
-    "Not applicable",
-]
-
-
-ANSWER_VALUE_MAP = {
-    "Yes": "yes",
-    "No": "no",
-    "Not sure": "not_sure",
-    "Not applicable": "not_applicable",
-}
