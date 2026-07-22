@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Optional
 
 import streamlit as st
 from PIL import Image
-
+from src.fix_tracker import get_fix_tracker_text, show_fix_tracker
 from src.ai_analysis import analyze_photo
 from src.checklist import ANSWER_OPTIONS, ANSWER_VALUE_MAP, CHECKLIST_QUESTIONS
 from src.constants import (
@@ -86,6 +86,8 @@ def initialize_session_state() -> None:
         "last_created_home_id": None,
         "current_room_id": None,
         "current_home_room_id": None,
+        "fix_statuses": {},
+        "fix_notes": {},
     }
 
     for key, value in defaults.items():
@@ -118,7 +120,8 @@ def reset_current_room_check() -> None:
     st.session_state["database_save_id"] = None
     st.session_state["current_room_id"] = None
     st.session_state["current_home_room_id"] = None
-
+    st.session_state["fix_statuses"] = {}
+    st.session_state["fix_notes"] = {}
 
 # -----------------------------------------------------------------------------
 # Home ID helpers
@@ -822,7 +825,7 @@ def show_checklist_summary_page() -> None:
         go_to_page("risk_score")
 
 
-def show_top_5_fixes() -> None:
+def show_top_5_fixes() -> List[Dict[str, Any]]:
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
     checklist_answers = st.session_state.get("checklist_answers", [])
@@ -833,6 +836,25 @@ def show_top_5_fixes() -> None:
         limit=5,
     )
 
+    st.subheader("Top 5 Fixes")
+
+    if not fixes:
+        st.info("No specific fixes were generated.")
+        return []
+
+    for fix in fixes:
+        st.markdown(
+            f"""
+            <div class="plain-card">
+                <strong>{fix.get("rank")}. [{safe_text(fix.get("priority"))}]</strong><br>
+                {safe_text(fix.get("text"))}<br>
+                <span class="small-muted">Source: {safe_text(fix.get("source"))}</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    return fixes
     st.subheader("Top 5 Fixes")
 
     if not fixes:
@@ -872,7 +894,8 @@ def show_risk_score_page() -> None:
 
     show_score_explanation_card(score_breakdown)
 
-    show_top_5_fixes()
+    fixes = show_top_5_fixes()
+    show_fix_tracker(fixes)
 
     st.divider()
     show_database_save_panel()

@@ -8,7 +8,7 @@ from datetime import date
 from typing import Any, Dict, List
 
 import streamlit as st
-
+from src.fix_tracker import get_fix_tracker_text
 from src.constants import SAFETY_DISCLAIMER
 from src.fixes import build_top_fixes_text, get_recommended_first_fixes
 from src.priorities import get_priority_for_hazard
@@ -78,7 +78,7 @@ def build_report_text() -> str:
         checklist_answers=checklist_answers,
         limit=5,
     )
-
+    fix_tracker_text = get_fix_tracker_text(fixes)
     return f"""
 AI SafeHome Safety Report
 Date: {date.today().strftime('%B %d, %Y')}
@@ -103,6 +103,9 @@ Checklist Concerns:
 
 Top 5 Fixes:
 {build_top_fixes_text(fixes)}
+
+Fix Tracker:
+{fix_tracker_text}
 
 Safety Disclaimer:
 {SAFETY_DISCLAIMER}
