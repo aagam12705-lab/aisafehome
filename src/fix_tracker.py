@@ -174,3 +174,23 @@ def get_fix_tracker_text(fixes: List[Dict[str, Any]]) -> str:
         lines.append(line)
 
     return "\n".join(lines)
+def attach_fix_tracker_data(fixes: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Adds status and note data to each fix before saving to the database.
+    """
+
+    statuses = get_fix_statuses()
+    notes = get_fix_notes()
+
+    tracked_fixes = []
+
+    for fix in fixes:
+        key = get_fix_key(fix)
+
+        updated_fix = dict(fix)
+        updated_fix["fix_status"] = statuses.get(key, "Not started")
+        updated_fix["fix_note"] = notes.get(key, "")
+
+        tracked_fixes.append(updated_fix)
+
+    return tracked_fixes
