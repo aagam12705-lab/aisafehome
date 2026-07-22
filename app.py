@@ -1,7 +1,13 @@
 import secrets
 import string
 from typing import Any, Dict, List, Optional
-
+from src.comparison import (
+    build_before_after_summary_text,
+    compare_hazard_categories,
+    get_check_display_label,
+    get_score_change_message,
+    sort_checks_oldest_to_newest,
+)
 import streamlit as st
 from PIL import Image
 from src.fix_tracker import (
@@ -1082,7 +1088,170 @@ Fix Tracker Summary:
 {chr(10).join(fix_status_lines)}
 """.strip()
 
+def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
+    st.subheader("Before/After Room Comparison")
 
+    try:
+        checks = fetch_room_checks_by_room_id(home_id, room_id, limit=100)
+    except Exception as error:
+        st.error("Could not load checks for comparison.")
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+
+    if len(checks) < 2:
+        st.info(
+            "Save at least two checks for this same Room ID to compare before and after results."
+        )
+        return
+
+    ordered_checks = sort_checks_oldest_to_newest(checks)
+
+    label_to_check = {
+        get_check_display_label(check): check
+        for check in ordered_checks
+    }
+
+    labels = list(label_to_check.keys())
+
+    before_label = st.selectbox(
+        "Choose before check",
+        labels,
+        index=0,
+        key=f"before_check_{room_id}",
+    )
+
+    after_label = st.selectbox(
+        "Choose after check",
+        labels,
+        index=len(labels) - 1,
+        key=f"after_check_{room_id}",
+    )
+
+    before_check = label_to_check[before_label]
+    after_check = label_to_check[after_label]
+
+    if before_check.get("id") == after_check.get("id"):
+        st.warning("Choose two different checks to compare.")
+        return
+
+    try:
+        before_details = fetch_room_check_details(before_check["id"])
+        after_details = fetch_room_check_details(after_check["id"])
+    except Exception as error:
+        st.error("Could not load check details for comparison.")
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+
+    comparison = compare_hazard_categories(
+        before_details=before_details,
+        after_details=after_details,
+    )
+
+    resolved_labels = [
+        get_category_label(category)
+        for category in sorted(comparison["resolved"])
+    ]
+
+    still_present_labels = [
+        get_category_label(category)
+        for category in sorted(comparison["still_present"])
+    ]
+
+    new_labels = [
+        get_category_label(category)
+        for category in sorted(comparison["new"])
+    ]
+
+    before_score = before_check.get("score", 0)
+    after_score = after_check.get("score", 0)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Before Score", f"{before_score}/100")
+    col2.metric("After Score", f"{after_score}/100")
+    col3.metric("Change", get_score_change_message(before_check, after_check))
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Before:</strong><br>
+            Saved At: {safe_text(format_database_datetime(before_check.get("created_at")))}<br>
+            Risk Label: {safe_text(before_check.get("risk_level"))}<br><br>
+
+            <strong>After:</strong><br>
+            Saved At: {safe_text(format_database_datetime(after_check.get("created_at")))}<br>
+            Risk Label: {safe_text(after_check.get("risk_level"))}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    col_a, col_b, col_c = st.columns(3)
+
+    with col_a:
+        st.markdown("### Resolved")
+        if resolved_labels:
+            for item in resolved_labels:
+                st.success(item)
+        else:
+            st.info("None")
+
+    with col_b:
+        st.markdown("### Still Present")
+        if still_present_labels:
+            for item in still_present_labels:
+                st.warning(item)
+        else:
+            st.info("None")
+
+    with col_c:
+        st.markdown("### New")
+        if new_labels:
+            for item in new_labels:
+                st.error(item)
+        else:
+            st.info("None")
+
+    comparison_text = build_before_after_summary_text(
+        before_check=before_check,
+        after_check=after_check,
+        resolved_labels=resolved_labels,
+        still_present_labels=still_present_labels,
+        new_labels=new_labels,
+    )
+
+    with st.expander("Copy / share comparison summary"):
+        st.text_area(
+            "Before/after summary",
+            value=comparison_text,
+            height=280,
+            key=f"before_after_text_{room_id}",
+        )
+
+        file_name = f"ai_safehome_before_after_{safe_filename_part(room_id)}.txt"
+
+        st.download_button(
+            label="Download Before/After Summary",
+            data=comparison_text,
+            file_name=file_name,
+            mime="text/plain",
+            key=f"before_after_download_{room_id}",
+        )
+
+    show_email_summary_panel(
+        summary_title="AI SafeHome Before/After Comparison",
+        summary_text=comparison_text,
+        default_subject=f"AI SafeHome Before/After - {room_id}",
+        key_prefix=f"before_after_email_{safe_filename_part(room_id)}",
+    )
+
+    show_share_summary_panel(
+        summary_title="AI SafeHome Before/After Comparison",
+        summary_text=comparison_text,
+        file_name=f"ai_safehome_before_after_{safe_filename_part(room_id)}.txt",
+        key_prefix=f"before_after_share_{safe_filename_part(room_id)}",
+    )
 def show_room_stats_page() -> None:
     st.title("🏠 AI SafeHome")
     st.subheader("Room-by-Room Stats")
@@ -1221,7 +1390,7 @@ def show_room_stats_page() -> None:
         )
     else:
         st.info("No check history for this room yet.")
-
+    show_before_after_room_comparison(home_id, selected_room_id)
     room_stats_email_text = build_room_stats_email_text(selected_stats)
 
     show_email_summary_panel(
