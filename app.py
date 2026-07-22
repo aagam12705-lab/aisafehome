@@ -62,7 +62,7 @@ from src.ui import (
 
 
 # -----------------------------------------------------------------------------
-# Session state
+# Session state fuctions
 # -----------------------------------------------------------------------------
 
 
@@ -1070,6 +1070,7 @@ Highest Score: {room_stats.get("highest_score")}/100
 Lowest Score: {room_stats.get("lowest_score")}/100
 Latest Risk Label: {room_stats.get("latest_risk_level")}
 Latest Check: {format_database_datetime(room_stats.get("latest_created_at"))}
+
 
 Most Common Hazards:
 {chr(10).join(hazard_lines)}
