@@ -413,11 +413,15 @@ def build_fix_detail_row(
         priority = fix.get("priority")
         title = fix.get("source")
         category = fix.get("category")
+        fix_status = fix.get("fix_status", "Not started")
+        fix_note = fix.get("fix_note", "")
     else:
         recommendation = str(fix)
         priority = None
         title = None
         category = None
+        fix_status = "Not started"
+        fix_note = ""
 
     return {
         "room_check_id": room_check_id,
@@ -429,9 +433,9 @@ def build_fix_detail_row(
         "checklist_question": None,
         "checklist_answer": None,
         "priority": priority,
+        "fix_status": fix_status,
+        "fix_note": fix_note,
     }
-
-
 def build_detail_rows(
     room_check_id: str,
     hazards: List[Dict[str, Any]],
@@ -702,7 +706,7 @@ def build_room_stats_record(
     hazard_counts: Dict[str, int] = {}
     checklist_answer_counts: Dict[str, int] = {}
     recommended_fix_count = 0
-
+    fix_status_counts: Dict[str, int] = {}
     for detail in detail_rows:
         detail_type = detail.get("detail_type")
 
@@ -716,6 +720,9 @@ def build_room_stats_record(
 
         elif detail_type == "recommended_fix":
             recommended_fix_count += 1
+
+            fix_status = detail.get("fix_status") or "Not started"
+            fix_status_counts[fix_status] = fix_status_counts.get(fix_status, 0) + 1
 
     top_hazard = max(hazard_counts, key=hazard_counts.get) if hazard_counts else None
 
@@ -737,6 +744,7 @@ def build_room_stats_record(
         "top_hazard": top_hazard,
         "checklist_answer_counts": checklist_answer_counts,
         "recommended_fix_count": recommended_fix_count,
+        "fix_status_counts": fix_status_counts,
     }
 
 

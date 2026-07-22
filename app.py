@@ -4,7 +4,11 @@ from typing import Any, Dict, List, Optional
 
 import streamlit as st
 from PIL import Image
-from src.fix_tracker import get_fix_tracker_text, show_fix_tracker
+from src.fix_tracker import (
+    attach_fix_tracker_data,
+    get_fix_tracker_text,
+    show_fix_tracker,
+)
 from src.ai_analysis import analyze_photo
 from src.checklist import ANSWER_OPTIONS, ANSWER_VALUE_MAP, CHECKLIST_QUESTIONS
 from src.constants import (
@@ -368,7 +372,7 @@ def get_current_database_save_payload() -> Dict[str, Any]:
         checklist_answers=checklist_answers,
         limit=5,
     )
-
+    tracked_fixes = attach_fix_tracker_data(fixes)
     return {
         "room_type": st.session_state.get("room_type"),
         "room_id": st.session_state.get("current_room_id"),
@@ -376,7 +380,7 @@ def get_current_database_save_payload() -> Dict[str, Any]:
         "risk_level": st.session_state.get("risk_level"),
         "hazards": hazards,
         "checklist_answers": checklist_answers,
-        "recommended_fixes": fixes,
+        "recommended_fixes": tracked_fixes,
         "checklist_was_skipped": st.session_state.get("checklist_was_skipped", False),
         "using_demo_sample": False,
         "demo_sample_name": None,
@@ -1040,7 +1044,7 @@ def show_saved_results_page() -> None:
 def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
     hazard_counts = room_stats.get("hazard_counts", {})
     checklist_counts = room_stats.get("checklist_answer_counts", {})
-
+    fix_status_counts = room_stats.get("fix_status_counts", {})
     hazard_lines = [
         f"- {get_category_label(category)}: {count}"
         for category, count in sorted(hazard_counts.items(), key=lambda item: item[1], reverse=True)
@@ -1050,6 +1054,10 @@ def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
         f"- {answer}: {count}"
         for answer, count in sorted(checklist_counts.items())
     ] or ["- No saved checklist answers yet."]
+    fix_status_lines = [
+        f"- {status}: {count}"
+        for status, count in sorted(fix_status_counts.items())
+    ] or ["- No saved fix tracker statuses yet."]
 
     return f"""
 Room ID: {room_stats.get("room_id")}
@@ -1068,6 +1076,9 @@ Most Common Hazards:
 
 Checklist Answer Summary:
 {chr(10).join(checklist_lines)}
+
+Fix Tracker Summary:
+{chr(10).join(fix_status_lines)}
 """.strip()
 
 
@@ -1156,7 +1167,22 @@ def show_room_stats_page() -> None:
         """,
         unsafe_allow_html=True,
     )
+    st.subheader("Fix Tracker Summary")
 
+    fix_status_counts = selected_stats.get("fix_status_counts", {})
+
+    if fix_status_counts:
+        fix_rows = [
+            {
+                "Status": status,
+                "Count": count,
+            }
+            for status, count in sorted(fix_status_counts.items())
+        ]
+
+        st.dataframe(fix_rows, use_container_width=True, hide_index=True)
+    else:
+        st.info("No saved fix tracker statuses yet.")
     st.subheader("Most Common Hazards")
 
     hazard_counts = selected_stats.get("hazard_counts", {})
