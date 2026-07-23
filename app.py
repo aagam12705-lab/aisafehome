@@ -22,6 +22,7 @@ from src.trends import (
 )
 from src.ai_analysis import analyze_photo
 from src.checklist import ANSWER_OPTIONS, ANSWER_VALUE_MAP, CHECKLIST_QUESTIONS
+from src.photo_quality import analyze_uploaded_photo_quality, build_photo_quality_text
 from src.constants import (
     ALLOWED_FILE_TYPES,
     LANDING_EXPLANATION,
@@ -82,6 +83,7 @@ def initialize_session_state() -> None:
         "page": "landing",
         "room_type": None,
         "photo_uploaded": False,
+        "photo_quality": None,
         "ai_result": None,
         "checklist_answers": [],
         "checklist_index": 0,
@@ -125,6 +127,7 @@ def reset_checklist_progress() -> None:
 def reset_current_room_check() -> None:
     st.session_state["room_type"] = None
     st.session_state["photo_uploaded"] = False
+    st.session_state["photo_quality"] = None
     st.session_state["ai_result"] = None
     reset_checklist_progress()
     st.session_state["score"] = None
@@ -620,6 +623,40 @@ def show_room_id_selection_page() -> None:
     if st.button("← Back to Room Selection"):
         go_to_page("room_selection")
 
+def show_photo_quality_card(quality: Dict[str, Any]) -> None:
+    label = quality.get("label", "Unknown")
+
+    if label == "Good":
+        st.success("Photo quality looks usable for AI analysis.")
+    elif label == "Caution":
+        st.warning("Photo may be usable, but AI analysis could be less reliable.")
+    elif label == "Poor":
+        st.error("Photo quality may be poor. AI analysis may miss hazards.")
+    else:
+        st.info("Photo quality could not be checked.")
+
+    metrics = quality.get("metrics", {})
+
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Photo Quality:</strong> {safe_text(label)}<br>
+            <strong>Resolution:</strong> {safe_text(metrics.get("width", "Unknown"))} × {safe_text(metrics.get("height", "Unknown"))}<br>
+            <strong>Brightness:</strong> {safe_text(metrics.get("brightness", "Unknown"))}<br>
+            <strong>Contrast:</strong> {safe_text(metrics.get("contrast", "Unknown"))}<br>
+            <strong>Sharpness estimate:</strong> {safe_text(metrics.get("edge_score", "Unknown"))}
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    with st.expander("Photo quality details"):
+        for issue in quality.get("issues", []):
+            st.write(f"- {issue}")
+
+        st.write("Suggestions:")
+        for suggestion in quality.get("suggestions", []):
+            st.write(f"- {suggestion}")
 
 def show_photo_upload_page() -> None:
     st.title("🏠 AI SafeHome")
@@ -663,7 +700,10 @@ def show_photo_upload_page() -> None:
 
         st.session_state["photo_uploaded"] = True
         st.success("Photo uploaded successfully.")
-
+        quality = analyze_uploaded_photo_quality(uploaded_file)
+        st.session_state["photo_quality"] = quality
+        show_photo_quality_card(quality)
+        uploaded_file.seek(0)
         if st.button("Analyze Photo →", type="primary"):
             with st.spinner("Analyzing photo..."):
                 ai_result = analyze_photo(uploaded_file, room_type)

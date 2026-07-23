@@ -6,7 +6,7 @@ Builds printable/shareable report text for AI SafeHome.
 
 from datetime import date
 from typing import Any, Dict, List
-
+from src.photo_quality import build_photo_quality_text
 import streamlit as st
 from src.fix_tracker import get_fix_tracker_text
 from src.constants import SAFETY_DISCLAIMER
@@ -70,7 +70,8 @@ def build_report_text() -> str:
     score = st.session_state.get("score", 0)
     risk_level = st.session_state.get("risk_level", "Low Risk")
     score_breakdown = st.session_state.get("score_breakdown") or {}
-
+    photo_quality = st.session_state.get("photo_quality") or {}
+    photo_quality_text = build_photo_quality_text(photo_quality)
     score_explanation = format_score_explanation(score_breakdown)
 
     fixes = get_recommended_first_fixes(
@@ -88,6 +89,9 @@ Room Checked:
 
 Room ID:
 {room_id}
+
+Photo Quality:
+{photo_quality_text}
 
 Fall-Hazard Score:
 {risk_level} — {score}/100
