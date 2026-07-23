@@ -15,6 +15,11 @@ from src.fix_tracker import (
     get_fix_tracker_text,
     show_fix_tracker,
 )
+from src.trends import (
+    build_score_trend_rows,
+    build_trend_summary_text,
+    get_trend_summary,
+)
 from src.ai_analysis import analyze_photo
 from src.checklist import ANSWER_OPTIONS, ANSWER_VALUE_MAP, CHECKLIST_QUESTIONS
 from src.constants import (
@@ -1252,6 +1257,75 @@ def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
         file_name=f"ai_safehome_before_after_{safe_filename_part(room_id)}.txt",
         key_prefix=f"before_after_share_{safe_filename_part(room_id)}",
     )
+def show_room_health_trend_chart(home_id: str, room_id: str) -> None:
+    st.subheader("Room Health Trend")
+
+    try:
+        checks = fetch_room_checks_by_room_id(home_id, room_id, limit=100)
+    except Exception as error:
+        st.error("Could not load room score trend.")
+        with st.expander("Technical details"):
+            st.code(str(error))
+        return
+
+    if len(checks) < 2:
+        st.info("Save at least two checks for this same Room ID to see a score trend.")
+        return
+
+    trend_rows = build_score_trend_rows(checks)
+    trend_summary = get_trend_summary(checks)
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("First Score", f"{trend_summary.get('first_score')}/100")
+    col2.metric("Latest Score", f"{trend_summary.get('latest_score')}/100")
+    col3.metric("Trend", trend_summary.get("direction"))
+
+    st.info(trend_summary.get("message"))
+
+    chart_rows = [
+        {
+            "Check Number": row["Check Number"],
+            "Score": row["Score"],
+        }
+        for row in trend_rows
+    ]
+
+    st.line_chart(
+        chart_rows,
+        x="Check Number",
+        y="Score",
+    )
+
+    st.dataframe(
+        trend_rows,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    trend_text = build_trend_summary_text(room_id, checks)
+
+    with st.expander("Copy / download trend summary"):
+        st.text_area(
+            "Trend summary",
+            value=trend_text,
+            height=260,
+            key=f"trend_text_{safe_filename_part(room_id)}",
+        )
+
+        st.download_button(
+            label="Download Trend Summary",
+            data=trend_text,
+            file_name=f"ai_safehome_trend_{safe_filename_part(room_id)}.txt",
+            mime="text/plain",
+            key=f"trend_download_{safe_filename_part(room_id)}",
+        )
+
+    show_email_summary_panel(
+        summary_title="AI SafeHome Room Health Trend",
+        summary_text=trend_text,
+        default_subject=f"AI SafeHome Room Trend - {room_id}",
+        key_prefix=f"trend_email_{safe_filename_part(room_id)}",
+    )
 def show_room_stats_page() -> None:
     st.title("🏠 AI SafeHome")
     st.subheader("Room-by-Room Stats")
@@ -1390,6 +1464,7 @@ def show_room_stats_page() -> None:
         )
     else:
         st.info("No check history for this room yet.")
+    show_room_health_trend_chart(home_id, selected_room_id)
     show_before_after_room_comparison(home_id, selected_room_id)
     room_stats_email_text = build_room_stats_email_text(selected_stats)
 
