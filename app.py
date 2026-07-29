@@ -1,6 +1,24 @@
+import importlib
+import io
 import secrets
 import string
 from typing import Any, Dict, List, Optional
+
+# Streamlit can retain an earlier version of a helper module after a source
+# change. Reload this local module before importing its helpers so a live app
+# cannot keep a partially loaded version that is missing newer functions.
+import src.database as _database_module
+import src.constants as _constants_module
+import src.ai_analysis as _ai_analysis_module
+import src.scoring as _scoring_module
+import src.ui as _ui_module
+
+importlib.reload(_database_module)
+importlib.reload(_constants_module)
+importlib.reload(_ai_analysis_module)
+importlib.reload(_scoring_module)
+importlib.reload(_ui_module)
+
 from src.comparison import (
     build_before_after_summary_text,
     compare_hazard_categories,
@@ -9,32 +27,27 @@ from src.comparison import (
     sort_checks_oldest_to_newest,
 )
 import streamlit as st
-from PIL import Image
-from src.fix_tracker import (
-    attach_fix_tracker_data,
-    get_fix_tracker_text,
-    show_fix_tracker,
-)
+from PIL import Image, ImageDraw
 from src.trends import (
     build_score_trend_rows,
     build_trend_summary_text,
     get_trend_summary,
 )
 from src.ai_analysis import analyze_photo
-from src.checklist import ANSWER_OPTIONS, ANSWER_VALUE_MAP, CHECKLIST_QUESTIONS
+from src.checklist import ANSWER_OPTIONS, ANSWER_VALUE_MAP
 from src.photo_quality import analyze_uploaded_photo_quality, build_photo_quality_text
 from src.constants import (
     ALLOWED_FILE_TYPES,
     LANDING_EXPLANATION,
     MAX_FILE_SIZE_MB,
-    PHOTO_NOT_STORED_NOTE,
-    PHOTO_UPLOAD_PRIVACY_WARNING,
-    PRIVACY_REMINDER,
     ROOM_OPTIONS,
     SAFETY_DISCLAIMER,
     TAGLINE,
 )
 from src.database import (
+    authenticate_home,
+    create_password_reset_code,
+    create_protected_home,
     create_home_id,
     create_home_room,
     fetch_all_room_stats_for_home,
@@ -51,8 +64,10 @@ from src.database import (
     is_database_enabled,
     is_home_id_available,
     is_valid_home_id,
+    reset_home_password,
     save_room_check,
 )
+from src.email_service import is_valid_email_address, send_summary_email
 from src.email_ui import show_email_summary_panel, show_share_summary_panel
 from src.fixes import build_top_fixes_text, get_recommended_first_fixes
 from src.priorities import get_priority_for_category, get_priority_for_hazard
@@ -68,6 +83,7 @@ from src.ui import (
     setup_page,
     show_accessibility_panel,
     show_current_home_and_room_status,
+    show_read_aloud_button,
     show_score_explanation_card,
     show_step_card,
 )
@@ -95,6 +111,7 @@ def initialize_session_state() -> None:
         "report_text": None,
         "text_size": "Standard",
         "color_scheme": "System",
+        "show_read_aloud": False,
         "database_save_complete": False,
         "database_save_id": None,
         "home_id": None,
@@ -103,8 +120,13 @@ def initialize_session_state() -> None:
         "last_created_home_id": None,
         "current_room_id": None,
         "current_home_room_id": None,
-        "fix_statuses": {},
-        "fix_notes": {},
+        "upload_nonce": 0,
+        "uploaded_photo_bytes": None,
+        "quick_mode": False,
+        "before_fix_comparison": None,
+        "after_fix_result": None,
+        "check_run_nonce": 0,
+        "database_saved_run_nonce": None,
     }
 
     for key, value in defaults.items():
@@ -124,6 +146,14 @@ def reset_checklist_progress() -> None:
     st.session_state["checklist_was_skipped"] = False
 
 
+def mark_new_room_check() -> None:
+    """Marks a new analysis so it is saved once, rather than on every rerun."""
+    st.session_state["check_run_nonce"] = st.session_state.get("check_run_nonce", 0) + 1
+    st.session_state["database_save_complete"] = False
+    st.session_state["database_save_id"] = None
+    st.session_state["database_saved_run_nonce"] = None
+
+
 def reset_current_room_check() -> None:
     st.session_state["room_type"] = None
     st.session_state["photo_uploaded"] = False
@@ -136,10 +166,13 @@ def reset_current_room_check() -> None:
     st.session_state["report_text"] = None
     st.session_state["database_save_complete"] = False
     st.session_state["database_save_id"] = None
+    st.session_state["database_saved_run_nonce"] = None
     st.session_state["current_room_id"] = None
     st.session_state["current_home_room_id"] = None
-    st.session_state["fix_statuses"] = {}
-    st.session_state["fix_notes"] = {}
+    st.session_state["uploaded_photo_bytes"] = None
+    st.session_state["before_fix_comparison"] = None
+    st.session_state["after_fix_result"] = None
+    st.session_state["upload_nonce"] = st.session_state.get("upload_nonce", 0) + 1
 
 # -----------------------------------------------------------------------------
 # Home ID helpers
@@ -149,7 +182,7 @@ def reset_current_room_check() -> None:
 def clean_home_id_input(home_id: Optional[str]) -> str:
     if not home_id:
         return ""
-    return str(home_id).strip().upper()
+    return " ".join(str(home_id).strip().split())
 
 
 def generate_home_id() -> str:
@@ -171,18 +204,18 @@ def log_out_home_id() -> None:
     st.session_state["last_created_home_id"] = None
 
 
-def log_in_with_home_id(home_id: str) -> bool:
+def log_in_with_home_id(home_id: str, password: str) -> bool:
     cleaned = clean_home_id_input(home_id)
 
     if not is_valid_home_id(cleaned):
         st.session_state["home_login_error"] = (
-            "Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT."
+            "Enter a Home ID between 1 and 80 characters."
         )
         st.session_state["home_login_message"] = None
         return False
 
     try:
-        exists = home_id_exists(cleaned)
+        exists = authenticate_home(cleaned, password)
     except Exception as error:
         st.session_state["home_login_error"] = (
             "Could not check this Home ID. Check your database connection."
@@ -192,7 +225,7 @@ def log_in_with_home_id(home_id: str) -> bool:
 
     if not exists:
         st.session_state["home_login_error"] = (
-            "No saved Home ID was found with that code. Create it first or check your spelling."
+            "The Home ID or password is incorrect."
         )
         st.session_state["home_login_message"] = None
         return False
@@ -221,12 +254,12 @@ def create_random_available_home_id() -> str:
     raise RuntimeError("Could not create a unique Home ID. Try again.")
 
 
-def create_custom_home_id(home_id: str) -> bool:
+def create_custom_home_id(home_id: str, password: str, recovery_email: str) -> bool:
     cleaned = clean_home_id_input(home_id)
 
     if not is_valid_home_id(cleaned):
         st.session_state["home_login_error"] = (
-            "Invalid Home ID. Use the format HOME-ABCD-1234-WXYZ."
+            "Enter a Home ID between 1 and 80 characters."
         )
         return False
 
@@ -237,7 +270,10 @@ def create_custom_home_id(home_id: str) -> bool:
             )
             return False
 
-        created = create_home_id(cleaned)
+        if not is_valid_email_address(recovery_email):
+            st.session_state["home_login_error"] = "Enter a valid recovery email."
+            return False
+        created = create_protected_home(cleaned, password, recovery_email)
         st.session_state["home_id"] = created
         st.session_state["last_created_home_id"] = created
         st.session_state["home_login_error"] = None
@@ -246,9 +282,9 @@ def create_custom_home_id(home_id: str) -> bool:
 
     except Exception as error:
         st.session_state["home_login_error"] = (
-            "Could not create this Home ID. Check your database connection."
+            f"Could not create this Home ID: {error}"
         )
-        st.session_state["home_login_message"] = str(error)
+        st.session_state["home_login_message"] = None
         return False
 
 
@@ -257,9 +293,6 @@ def show_home_id_status(key_suffix: str = "main") -> None:
 
     if home_id:
         st.success(f"Logged in with Home ID: {home_id}")
-        st.caption(
-            "Save this Home ID somewhere safe. Anyone with this code can view checks saved under it."
-        )
 
         if st.button("Log Out of Home ID", key=f"log_out_home_id_{key_suffix}"):
             log_out_home_id()
@@ -271,13 +304,9 @@ def show_home_id_status(key_suffix: str = "main") -> None:
 def show_home_id_login_box(key_prefix: str = "home_id") -> None:
     st.subheader("Home ID Login")
     st.write(
-        "Use an anonymous Home ID to save and view checks for one home. "
-        "Do not use a name or address."
+        "Choose a Home ID to save and view checks for one home."
     )
 
-    st.warning(
-        "A Home ID is not a password. Anyone with the Home ID can view checks saved under it."
-    )
 
     st.caption(get_database_status_message())
 
@@ -293,37 +322,21 @@ def show_home_id_login_box(key_prefix: str = "home_id") -> None:
     if st.session_state.get("home_login_message"):
         st.info(st.session_state["home_login_message"])
 
-    tab1, tab2, tab3 = st.tabs(
-        ["Create Random ID", "Choose Custom ID", "Log In Existing ID"]
-    )
+    tab1, tab2 = st.tabs(["Create Home ID", "Log In / Recover Password"])
 
     with tab1:
-        if st.button(
-            "Create Random Home ID",
-            key=f"{key_prefix}_random",
-            type="primary",
-        ):
-            try:
-                created = create_random_available_home_id()
-                st.success(f"Created Home ID: {created}")
-                st.warning("Copy this Home ID now. You need it later to view saved checks.")
-                st.rerun()
-            except Exception as error:
-                st.error("Could not create a random Home ID.")
-                with st.expander("Technical details"):
-                    st.code(str(error))
-
-    with tab2:
         custom = st.text_input(
             "Choose a Home ID",
-            placeholder="HOME-SAFE-2026-DEMO",
+            placeholder="My Home",
             key=f"{key_prefix}_custom",
         )
+        password = st.text_input("Create password", type="password", key=f"{key_prefix}_password")
+        recovery_email = st.text_input("Recovery email", key=f"{key_prefix}_recovery_email")
 
         if st.button("Check Availability", key=f"{key_prefix}_check"):
             try:
                 if not is_valid_home_id(custom):
-                    st.error("Invalid format. Use something like HOME-ABCD-1234-WXYZ.")
+                    st.error("Enter a Home ID between 1 and 80 characters.")
                 elif is_home_id_available(custom):
                     st.success("This Home ID is available.")
                 else:
@@ -338,25 +351,44 @@ def show_home_id_login_box(key_prefix: str = "home_id") -> None:
             key=f"{key_prefix}_create_custom",
             type="primary",
         ):
-            if create_custom_home_id(custom):
+            if create_custom_home_id(custom, password, recovery_email):
                 st.success(f"Created Home ID: {st.session_state['home_id']}")
                 st.rerun()
 
-    with tab3:
+    with tab2:
         existing = st.text_input(
             "Enter existing Home ID",
-            placeholder="HOME-8K2M-Q9PA-W4ZT",
+            placeholder="My Home",
             key=f"{key_prefix}_existing",
         )
+        password = st.text_input("Password", type="password", key=f"{key_prefix}_login_password")
 
         if st.button(
             "Log In with Home ID",
             key=f"{key_prefix}_login",
             type="primary",
         ):
-            if log_in_with_home_id(existing):
+            if log_in_with_home_id(existing, password):
                 st.success("Home ID login successful.")
                 st.rerun()
+
+        with st.expander("Forgot password?"):
+            reset_home = st.text_input("Home ID", key=f"{key_prefix}_reset_home")
+            if st.button("Email Reset Code", key=f"{key_prefix}_send_reset"):
+                try:
+                    email, code = create_password_reset_code(reset_home)
+                    send_summary_email(email, "AI SafeHome password reset", f"Your reset code is {code}. It expires in 15 minutes.")
+                    st.success("A reset code was sent.")
+                except Exception as error:
+                    st.error(str(error))
+            reset_code = st.text_input("Reset code", key=f"{key_prefix}_reset_code")
+            new_password = st.text_input("New password", type="password", key=f"{key_prefix}_new_password")
+            if st.button("Reset Password", key=f"{key_prefix}_reset_password"):
+                try:
+                    reset_home_password(reset_home, reset_code, new_password)
+                    st.success("Password reset. You can now log in.")
+                except Exception as error:
+                    st.error(str(error))
 
 
 # -----------------------------------------------------------------------------
@@ -386,7 +418,9 @@ def get_current_database_save_payload() -> Dict[str, Any]:
         checklist_answers=checklist_answers,
         limit=5,
     )
-    tracked_fixes = attach_fix_tracker_data(fixes)
+    analysis_mode = ai_result.get("analysis_mode", "sample")
+    is_sample_result = analysis_mode != "real"
+
     return {
         "room_type": st.session_state.get("room_type"),
         "room_id": st.session_state.get("current_room_id"),
@@ -394,15 +428,21 @@ def get_current_database_save_payload() -> Dict[str, Any]:
         "risk_level": st.session_state.get("risk_level"),
         "hazards": hazards,
         "checklist_answers": checklist_answers,
-        "recommended_fixes": tracked_fixes,
+        "recommended_fixes": fixes,
         "checklist_was_skipped": st.session_state.get("checklist_was_skipped", False),
-        "using_demo_sample": False,
-        "demo_sample_name": None,
+        "using_demo_sample": is_sample_result,
+        "demo_sample_name": (
+            "Built-in sample analysis"
+            if analysis_mode == "sample"
+            else "Fallback sample analysis"
+            if analysis_mode == "fallback"
+            else None
+        ),
     }
 
 
 def show_database_save_panel() -> None:
-    st.subheader("Save Anonymous Result")
+    st.subheader("Save Result")
 
     st.caption(get_database_status_message())
 
@@ -426,20 +466,14 @@ def show_database_save_panel() -> None:
         return
 
     if st.session_state.get("database_save_complete"):
-        st.success(f"Already saved. Check ID: {st.session_state.get('database_save_id')}")
+        st.success(f"This check is in your room stats. Check ID: {st.session_state.get('database_save_id')}")
+        if st.button("View Updated Room Stats"):
+            go_to_page("room_stats")
         return
 
     st.success(f"Saving under Home ID {home_id} and Room ID {room_id}")
 
-    safety_confirmed = st.checkbox(
-        "I confirm this result contains no personal, medical, or real patient information.",
-        key="database_safety_confirmed",
-    )
-
-    if st.button("Save Anonymous Result", type="primary"):
-        if not safety_confirmed:
-            st.error("Confirm the privacy checkbox before saving.")
-            return
+    if st.button("Save Result", type="primary"):
 
         payload = get_current_database_save_payload()
 
@@ -453,7 +487,7 @@ def show_database_save_panel() -> None:
                 checklist_answers=payload["checklist_answers"],
                 recommended_fixes=payload["recommended_fixes"],
                 checklist_was_skipped=payload["checklist_was_skipped"],
-                safety_confirmed=safety_confirmed,
+                safety_confirmed=True,
                 using_demo_sample=payload["using_demo_sample"],
                 demo_sample_name=payload["demo_sample_name"],
                 room_id=payload["room_id"],
@@ -470,23 +504,78 @@ def show_database_save_panel() -> None:
                 st.code(str(error))
 
 
+def automatically_save_current_room_check() -> None:
+    """Adds each completed tracked room check to saved stats exactly once."""
+    home_id = get_logged_in_home_id()
+    if not is_database_enabled() or not home_id or not st.session_state.get("current_room_id"):
+        return
+
+    run_nonce = st.session_state.get("check_run_nonce", 0)
+    if st.session_state.get("database_saved_run_nonce") == run_nonce:
+        return
+
+    payload = get_current_database_save_payload()
+    if payload.get("score") is None or not payload.get("room_type"):
+        return
+
+    try:
+        saved_id = save_room_check(
+            home_id=home_id,
+            room_type=payload["room_type"],
+            score=payload["score"],
+            risk_level=payload["risk_level"],
+            hazards=payload["hazards"],
+            checklist_answers=payload["checklist_answers"],
+            recommended_fixes=payload["recommended_fixes"],
+            checklist_was_skipped=payload["checklist_was_skipped"],
+            safety_confirmed=True,
+            using_demo_sample=payload["using_demo_sample"],
+            demo_sample_name=payload["demo_sample_name"],
+            room_id=payload["room_id"],
+        )
+        st.session_state["database_save_complete"] = True
+        st.session_state["database_save_id"] = saved_id
+        st.session_state["database_saved_run_nonce"] = run_nonce
+        st.success("This completed room check was added to your room stats.")
+    except Exception:
+        st.warning("This check could not be added to room stats yet. You can save it from the section below.")
+
+
 # -----------------------------------------------------------------------------
 # Pages
 # -----------------------------------------------------------------------------
 
 
 def show_landing_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.markdown(f'<div class="big-tagline">{TAGLINE}</div>', unsafe_allow_html=True)
 
     st.write(LANDING_EXPLANATION)
     st.warning(SAFETY_DISCLAIMER)
-    st.info(PRIVACY_REMINDER)
+
+    st.markdown(
+        """
+        <div class="plain-card">
+            <strong>How it works</strong><br><br>
+            1. Choose one room.<br>
+            2. Upload a staged room photo.<br>
+            3. Review possible hazards and answer simple questions.<br>
+            4. Read your score, suggested fixes, and safety report.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     show_home_id_status(key_suffix="landing")
 
     if st.button("Start Safety Check", type="primary"):
         reset_current_room_check()
+        st.session_state["quick_mode"] = False
+        go_to_page("room_selection")
+
+    if st.button("Quick Safety Check"):
+        reset_current_room_check()
+        st.session_state["quick_mode"] = True
         go_to_page("room_selection")
 
     if st.button("Access Saved Checks by Home ID"):
@@ -497,9 +586,12 @@ def show_landing_page() -> None:
 
 
 def show_room_selection_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Step 1: Choose a Room")
-    show_step_card("Step 1 of 6 — Choose the room you want to check.")
+    if st.session_state.get("quick_mode"):
+        show_step_card("Quick Safety Check — Choose the room. No account or Room ID is needed unless you decide to save later.")
+    else:
+        show_step_card("Step 1 of 6 — Choose the room you want to check.")
 
     selected_room = st.radio("Which room are you checking?", ROOM_OPTIONS, index=0)
 
@@ -507,14 +599,14 @@ def show_room_selection_page() -> None:
         st.session_state["room_type"] = selected_room
         st.session_state["current_room_id"] = None
         st.session_state["current_home_room_id"] = None
-        go_to_page("room_id_selection")
+        go_to_page("photo_upload" if st.session_state.get("quick_mode") else "room_id_selection")
 
     if st.button("← Back to Landing Page"):
         go_to_page("landing")
 
 
 def show_room_id_selection_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Choose Room ID")
 
     room_type = st.session_state.get("room_type")
@@ -590,7 +682,7 @@ def show_room_id_selection_page() -> None:
                 selected_room = room_options[selected]
                 st.session_state["current_room_id"] = selected_room["room_id"]
                 st.session_state["current_home_room_id"] = selected_room["id"]
-                go_to_page("photo_upload")
+                go_to_page("risk_score" if st.session_state.get("ai_result") else "photo_upload")
 
     with tab2:
         st.caption("Use IDs like BEDROOM-1, BEDROOM-2, BATHROOM-1. Do not use names or addresses.")
@@ -611,7 +703,7 @@ def show_room_id_selection_page() -> None:
 
                 st.session_state["current_room_id"] = created_room["room_id"]
                 st.session_state["current_home_room_id"] = created_room["id"]
-                go_to_page("photo_upload")
+                go_to_page("risk_score" if st.session_state.get("ai_result") else "photo_upload")
 
             except Exception as error:
                 st.error("Could not create that Room ID.")
@@ -658,8 +750,50 @@ def show_photo_quality_card(quality: Dict[str, Any]) -> None:
         for suggestion in quality.get("suggestions", []):
             st.write(f"- {suggestion}")
 
+
+def render_hazard_location_guide(image_bytes: Optional[bytes], hazards: List[Dict[str, Any]]) -> None:
+    """Displays approximate numbered markers tied to the hazard cards below."""
+    if not image_bytes or not hazards:
+        return
+
+    try:
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except (OSError, ValueError):
+        return
+
+    positions = [
+        (0.25, 0.72), (0.72, 0.72), (0.50, 0.56), (0.25, 0.35),
+        (0.75, 0.35), (0.50, 0.22), (0.12, 0.55), (0.88, 0.55),
+    ]
+    draw = ImageDraw.Draw(image)
+    radius = max(18, min(image.size) // 22)
+
+    for index, hazard in enumerate(hazards[:8], start=1):
+        location = f"{hazard.get('location', '')} {hazard.get('evidence', '')}".lower()
+        x_ratio, y_ratio = positions[index - 1]
+        if isinstance(hazard.get("location_x"), int) and isinstance(hazard.get("location_y"), int):
+            x_ratio = hazard["location_x"] / 100
+            y_ratio = hazard["location_y"] / 100
+        elif "left" in location:
+            x_ratio = 0.22
+        elif "right" in location:
+            x_ratio = 0.78
+        if any(word in location for word in ("floor", "lower", "foreground", "ankle")):
+            y_ratio = 0.74
+        elif any(word in location for word in ("upper", "background", "wall", "high")):
+            y_ratio = 0.30
+
+        x, y = int(image.width * x_ratio), int(image.height * y_ratio)
+        draw.ellipse((x - radius, y - radius, x + radius, y + radius), outline="#2563eb", width=max(3, radius // 6))
+        draw.ellipse((x - radius // 2, y - radius // 2, x + radius // 2, y + radius // 2), fill="#ffffff", outline="#2563eb", width=2)
+        draw.text((x - radius // 4, y - radius // 2), str(index), fill="#1e3a8a")
+
+    st.image(image, caption="AI-marked hazard locations. Each numbered circle matches the hazard card below.", use_container_width=True)
+    for index, hazard in enumerate(hazards[:8], start=1):
+        st.caption(f"{index}. {hazard.get('location') or hazard.get('evidence') or 'Approximate area shown by the marker.'}")
+
 def show_photo_upload_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Step 2: Upload Room Photo")
     show_step_card("Step 2 of 6 — Upload or take a staged room photo.")
 
@@ -678,14 +812,15 @@ def show_photo_upload_page() -> None:
 
     show_current_home_and_room_status()
 
-    st.warning(PHOTO_UPLOAD_PRIVACY_WARNING)
-    st.info(PHOTO_NOT_STORED_NOTE)
 
     uploaded_file = st.file_uploader(
-        "Upload or take a room photo",
+        "Upload or take one room photo (30 MB maximum)",
         type=ALLOWED_FILE_TYPES,
-        help="On iPhone, this may let you choose Photo Library or Take Photo.",
+        accept_multiple_files=False,
+        help="One JPG, PNG, or WEBP photo only. On iPhone, this may let you choose Photo Library or Take Photo.",
+        key=f"room_photo_{st.session_state.get('upload_nonce', 0)}",
     )
+    st.caption("One photo at a time • JPG, PNG, or WEBP • 30 MB maximum")
 
     if uploaded_file is not None:
         valid, error = validate_uploaded_photo(uploaded_file)
@@ -694,8 +829,17 @@ def show_photo_upload_page() -> None:
             st.error(error)
             return
 
-        image = Image.open(uploaded_file)
+        try:
+            image = Image.open(uploaded_file)
+            image.load()
+        except (OSError, ValueError):
+            st.error("This file could not be read as an image. Choose a valid JPG, PNG, or WEBP photo.")
+            uploaded_file.seek(0)
+            return
+
         st.image(image, caption=f"Preview of uploaded {room_type} photo", use_container_width=True)
+        uploaded_file.seek(0)
+        st.session_state["uploaded_photo_bytes"] = uploaded_file.getvalue()
         uploaded_file.seek(0)
 
         st.session_state["photo_uploaded"] = True
@@ -712,24 +856,51 @@ def show_photo_upload_page() -> None:
                     hazard["priority"] = hazard.get("priority") or get_priority_for_hazard(hazard)
 
                 st.session_state["ai_result"] = ai_result
+                mark_new_room_check()
 
-            go_to_page("ai_results")
+            go_to_page("checklist" if st.session_state.get("quick_mode") else "ai_results")
 
-    if st.button("← Back to Room ID"):
-        go_to_page("room_id_selection")
+    if st.button("← Back"):
+        go_to_page("room_selection" if st.session_state.get("quick_mode") else "room_id_selection")
 
 
 def show_ai_results_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Step 3: AI Results")
     show_step_card("Step 3 of 6 — Review possible hazards found by AI.")
 
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
 
+    analysis_mode = ai_result.get("analysis_mode")
+    if analysis_mode in {"sample", "fallback"}:
+        st.info("These are sample results, not findings from the uploaded photo.")
+
     st.write(ai_result.get("summary", "No summary available."))
 
+    urgent_hazards = [
+        hazard for hazard in hazards
+        if (hazard.get("priority") or get_priority_for_hazard(hazard)) == "Fix Now"
+    ]
+    if urgent_hazards:
+        st.error("Address this first: urgent possible safety hazards.")
+        for hazard in urgent_hazards[:3]:
+            st.write(
+                f"**{hazard.get('title', 'Possible hazard')}** — "
+                f"{hazard.get('recommendation', 'Review this area right away.')}"
+            )
+
+    read_aloud_text = "AI results. " + str(ai_result.get("summary", ""))
+    if urgent_hazards:
+        read_aloud_text += " Urgent safety alert. " + " ".join(
+            f"{hazard.get('title', 'Possible hazard')}. {hazard.get('recommendation', '')}"
+            for hazard in urgent_hazards[:3]
+        )
+    show_read_aloud_button(read_aloud_text, "ai_results")
+
     if hazards:
+        st.subheader("Hazard Locations in the Photo")
+        render_hazard_location_guide(st.session_state.get("uploaded_photo_bytes"), hazards)
         for index, hazard in enumerate(hazards, start=1):
             render_hazard_card(hazard, index)
     else:
@@ -770,10 +941,16 @@ def save_checklist_answer(question: Dict[str, Any], answer_label: str) -> None:
     }
 
 
-def build_ordered_checklist_answers() -> List[Dict[str, Any]]:
+def get_ai_checklist_questions() -> List[Dict[str, Any]]:
+    ai_result = st.session_state.get("ai_result") or {}
+    questions = ai_result.get("checklist_questions", [])
+    return questions if isinstance(questions, list) else []
+
+
+def build_ordered_checklist_answers(questions: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     ordered = []
 
-    for question in CHECKLIST_QUESTIONS:
+    for question in questions:
         saved = st.session_state["checklist_answers_by_id"].get(question["id"])
         if saved:
             ordered.append(saved)
@@ -782,32 +959,49 @@ def build_ordered_checklist_answers() -> List[Dict[str, Any]]:
 
 
 def finish_checklist() -> None:
-    st.session_state["checklist_answers"] = build_ordered_checklist_answers()
+    st.session_state["checklist_answers"] = build_ordered_checklist_answers(
+        get_ai_checklist_questions()
+    )
     go_to_page("checklist_summary")
 
 
-def skip_entire_checklist() -> None:
+def skip_follow_up_questions() -> None:
     st.session_state["checklist_answers"] = []
     st.session_state["checklist_was_skipped"] = True
     go_to_page("checklist_summary")
 
 
 def show_checklist_page() -> None:
-    st.title("🏠 AI SafeHome")
-    st.subheader("Step 4: Safety Checklist")
-    show_step_card("Step 4 of 6 — Answer one checklist question at a time.")
+    st.title("AI SafeHome")
+    st.subheader("Step 4: AI Follow-Up Questions")
+    show_step_card("Step 4 of 6 — Answer only the questions the AI could not confirm from the photo.")
 
     index = st.session_state.get("checklist_index", 0)
+    questions = get_ai_checklist_questions()
 
-    if index >= len(CHECKLIST_QUESTIONS):
+    if not questions:
+        st.info("The AI did not identify any important uncertainties that need a follow-up question.")
+        if st.button("Continue to Score →", type="primary"):
+            finish_checklist()
+        return
+
+    if index >= len(questions):
         finish_checklist()
         return
 
-    question = CHECKLIST_QUESTIONS[index]
+    question = questions[index]
 
-    st.progress((index + 1) / len(CHECKLIST_QUESTIONS))
-    st.write(f"Question {index + 1} of {len(CHECKLIST_QUESTIONS)}")
+    st.progress((index + 1) / len(questions))
+    st.write(f"Follow-up question {index + 1} of {len(questions)}")
     st.markdown(f"### {question['text']}")
+    if question.get("reason"):
+        st.caption(f"Why we are asking: {question['reason']}")
+
+    show_read_aloud_button(
+        f"Follow-up question {index + 1} of {len(questions)}. {question['text']}. "
+        f"Why we are asking: {question.get('reason', 'The photo did not clearly show this.')}",
+        f"follow_up_{question['id']}",
+    )
 
     answer_label = st.radio(
         "Choose an answer",
@@ -818,7 +1012,7 @@ def show_checklist_page() -> None:
     if st.button("Save and Next →", type="primary"):
         save_checklist_answer(question, answer_label)
 
-        if index + 1 >= len(CHECKLIST_QUESTIONS):
+        if index + 1 >= len(questions):
             finish_checklist()
         else:
             st.session_state["checklist_index"] = index + 1
@@ -834,14 +1028,14 @@ def show_checklist_page() -> None:
             "priority": get_priority_for_category(question["category"]),
         }
 
-        if index + 1 >= len(CHECKLIST_QUESTIONS):
+        if index + 1 >= len(questions):
             finish_checklist()
         else:
             st.session_state["checklist_index"] = index + 1
             st.rerun()
 
-    if st.button("Skip Entire Checklist"):
-        skip_entire_checklist()
+    if st.button("Skip Follow-Up Questions"):
+        skip_follow_up_questions()
 
     if index > 0:
         if st.button("← Previous Question"):
@@ -850,21 +1044,26 @@ def show_checklist_page() -> None:
 
 
 def show_checklist_summary_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Checklist Summary")
 
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
     checklist_answers = st.session_state.get("checklist_answers", [])
+    skip_buffer_points = (
+        int(ai_result.get("skip_buffer_points", 0))
+        if st.session_state.get("checklist_was_skipped")
+        else 0
+    )
 
     if st.session_state.get("checklist_was_skipped"):
-        st.info("Checklist was skipped. Score uses AI hazards only.")
+        st.info(f"Follow-up questions were skipped. An AI uncertainty buffer of {skip_buffer_points} points was added.")
     else:
         st.write(f"Checklist answers saved: {len(checklist_answers)}")
 
-    score = calculate_score(hazards, checklist_answers)
+    score = calculate_score(hazards, checklist_answers, skip_buffer_points)
     risk_level = get_risk_level(score)
-    score_breakdown = get_score_breakdown(hazards, checklist_answers)
+    score_breakdown = get_score_breakdown(hazards, checklist_answers, skip_buffer_points)
 
     st.session_state["score"] = score
     st.session_state["risk_level"] = risk_level
@@ -880,7 +1079,7 @@ def show_checklist_summary_page() -> None:
         go_to_page("risk_score")
 
 
-def show_top_5_fixes() -> List[Dict[str, Any]]:
+def show_top_5_fixes(limit: int = 5) -> List[Dict[str, Any]]:
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
     checklist_answers = st.session_state.get("checklist_answers", [])
@@ -888,49 +1087,80 @@ def show_top_5_fixes() -> List[Dict[str, Any]]:
     fixes = get_recommended_first_fixes(
         ai_hazards=hazards,
         checklist_answers=checklist_answers,
-        limit=5,
+        limit=limit,
     )
 
-    st.subheader("Top 5 Fixes")
+    st.subheader(f"Top {limit} Fixes")
 
     if not fixes:
         st.info("No specific fixes were generated.")
         return []
 
     for fix in fixes:
+        impact_points = max(0, int(fix.get("points", 0) or 0))
+        lower_impact = max(1, round(impact_points * 0.5)) if impact_points else 0
+        help_note = " Ask someone for help with this installation or repair." if fix.get("category") in {"handrail", "bathroom_grab_bars", "stairs", "uneven_floor"} else ""
         st.markdown(
             f"""
             <div class="plain-card">
                 <strong>{fix.get("rank")}. [{safe_text(fix.get("priority"))}]</strong><br>
                 {safe_text(fix.get("text"))}<br>
+                <span class="small-muted">Potential score impact: about {lower_impact}–{impact_points} points if this concern is confirmed and resolved. Helps make walking areas safer and clearer.{safe_text(help_note)}</span><br>
                 <span class="small-muted">Source: {safe_text(fix.get("source"))}</span>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
+    show_read_aloud_button(build_top_fixes_text(fixes), "top_fixes")
     return fixes
-    st.subheader("Top 5 Fixes")
 
-    if not fixes:
-        st.info("No specific fixes were generated.")
+
+def show_current_check_comparison() -> None:
+    """Compares a recheck to the latest saved result for the same Room ID."""
+    home_id = get_logged_in_home_id()
+    room_id = st.session_state.get("current_room_id")
+    current_hazards = (st.session_state.get("ai_result") or {}).get("hazards", [])
+
+    if not (is_database_enabled() and home_id and room_id and current_hazards):
         return
 
-    for fix in fixes:
-        st.markdown(
-            f"""
-            <div class="plain-card">
-                <strong>{fix.get("rank")}. [{safe_text(fix.get("priority"))}]</strong><br>
-                {safe_text(fix.get("text"))}<br>
-                <span class="small-muted">Source: {safe_text(fix.get("source"))}</span>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    try:
+        previous_checks = fetch_room_checks_by_room_id(home_id, room_id, limit=1)
+        if not previous_checks:
+            return
+        previous_check = previous_checks[0]
+        previous_details = fetch_room_check_details(previous_check["id"], home_id)
+    except Exception:
+        st.info("A saved-room comparison will be available after this check is saved.")
+        return
+
+    current_details = [
+        {"detail_type": "ai_hazard", "category": hazard.get("category")}
+        for hazard in current_hazards
+        if hazard.get("category")
+    ]
+    comparison = compare_hazard_categories(previous_details, current_details)
+    resolved = [get_category_label(item) for item in sorted(comparison["resolved"])]
+    still_present = [get_category_label(item) for item in sorted(comparison["still_present"])]
+    new = [get_category_label(item) for item in sorted(comparison["new"])]
+
+    st.subheader(f"Comparison with Your Last Saved {st.session_state.get('room_type', 'Room')} Check")
+    col1, col2 = st.columns(2)
+    col1.metric("Previous Score", f"{previous_check.get('score', 0)}/100")
+    col2.metric("Current Score", f"{st.session_state.get('score', 0)}/100")
+    st.caption("This compares the current photo with the latest saved check for this same Room ID.")
+
+    for heading, items, display in [
+        ("Hazards resolved", resolved, st.success),
+        ("Still needing attention", still_present, st.warning),
+        ("New hazards detected", new, st.error),
+    ]:
+        st.write(f"**{heading}:** " + (", ".join(items) if items else "None"))
 
 
 def show_risk_score_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Step 5: Risk Score")
     show_step_card("Step 5 of 6 — Review score and first fixes.")
 
@@ -948,23 +1178,41 @@ def show_risk_score_page() -> None:
     st.write(f"Risk label: **{risk_level}**")
 
     show_score_explanation_card(score_breakdown)
+    show_current_check_comparison()
+    automatically_save_current_room_check()
 
-    fixes = show_top_5_fixes()
-    show_fix_tracker(fixes)
+    quick_mode = st.session_state.get("quick_mode")
+    show_top_5_fixes(limit=3 if quick_mode else 5)
 
-    st.divider()
-    show_database_save_panel()
+    if quick_mode:
+        st.info("Quick Safety Check stays private to this browser session unless you choose to save it.")
+        if st.button("Save This Check"):
+            st.session_state["quick_mode"] = False
+            go_to_page("room_id_selection")
+    else:
+        st.divider()
+        show_database_save_panel()
 
     if st.button("Create Safety Report →", type="primary"):
         st.session_state["report_text"] = build_report_text()
         go_to_page("safety_report")
+
+    if st.session_state.get("uploaded_photo_bytes") and st.session_state.get("ai_result"):
+        if st.button("Compare After Making Fixes"):
+            st.session_state["before_fix_comparison"] = {
+                "photo_bytes": st.session_state.get("uploaded_photo_bytes"),
+                "hazards": st.session_state.get("ai_result", {}).get("hazards", []),
+                "score": score,
+            }
+            st.session_state["after_fix_result"] = None
+            go_to_page("after_fixes_photo")
 
     if st.button("View Room-by-Room Stats"):
         go_to_page("room_stats")
 
 
 def show_safety_report_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Step 6: Safety Report")
 
     report_text = st.session_state.get("report_text") or build_report_text()
@@ -974,6 +1222,8 @@ def show_safety_report_page() -> None:
         f'<div class="print-report">{safe_text(report_text)}</div>',
         unsafe_allow_html=True,
     )
+
+    show_read_aloud_button(report_text, "safety_report")
 
     room_id = st.session_state.get("current_room_id") or "ROOM"
     file_name = f"ai_safehome_report_{safe_filename_part(room_id)}.txt"
@@ -1007,8 +1257,103 @@ def show_safety_report_page() -> None:
         go_to_page("landing")
 
 
+def show_after_fixes_photo_page() -> None:
+    """Lets a person photograph the room again and compare photo-based findings."""
+    before = st.session_state.get("before_fix_comparison") or {}
+    if not before.get("photo_bytes"):
+        st.error("Start a safety check before creating a before-and-after comparison.")
+        if st.button("Back to Risk Score"):
+            go_to_page("risk_score")
+        return
+
+    st.title("AI SafeHome")
+    st.subheader("Photo Comparison After Fixes")
+    show_step_card("Take a new photo of the same room after making changes. AI SafeHome will compare possible hazards from both photos.")
+
+    st.image(before["photo_bytes"], caption="Before: original room photo", use_container_width=True)
+    after_photo = st.file_uploader(
+        "Upload or take one new room photo (30 MB maximum)",
+        type=ALLOWED_FILE_TYPES,
+        accept_multiple_files=False,
+        help="One JPG, PNG, or WEBP photo only.",
+        key=f"after_fixes_photo_{st.session_state.get('upload_nonce', 0)}",
+    )
+    st.caption("One photo at a time • JPG, PNG, or WEBP • 30 MB maximum")
+
+    if after_photo is None:
+        if st.button("← Back to Risk Score"):
+            go_to_page("risk_score")
+        return
+
+    valid, error = validate_uploaded_photo(after_photo)
+    if not valid:
+        st.error(error)
+        return
+
+    try:
+        after_image = Image.open(after_photo)
+        after_image.load()
+    except (OSError, ValueError):
+        st.error("This file could not be read as an image. Choose a valid JPG, PNG, or WEBP photo.")
+        return
+
+    st.image(after_image, caption="After: new room photo", use_container_width=True)
+    after_photo.seek(0)
+
+    if st.button("Analyze and Compare Photos", type="primary"):
+        with st.spinner("Analyzing the new photo and comparing results..."):
+            after_result = analyze_photo(after_photo, st.session_state.get("room_type") or "Other")
+            after_hazards = after_result.get("hazards", [])
+            for hazard in after_hazards:
+                hazard["priority"] = hazard.get("priority") or get_priority_for_hazard(hazard)
+        st.session_state["after_fix_result"] = {
+            "result": after_result,
+            "photo_bytes": after_photo.getvalue(),
+        }
+
+    saved_after = st.session_state.get("after_fix_result") or {}
+    if saved_after.get("result"):
+        after_result = saved_after["result"]
+        after_hazards = after_result.get("hazards", [])
+        before_hazards = before.get("hazards", [])
+        before_categories = {item.get("category") for item in before_hazards if item.get("category")}
+        after_categories = {item.get("category") for item in after_hazards if item.get("category")}
+        resolved = sorted(before_categories - after_categories)
+        still_present = sorted(before_categories & after_categories)
+        new = sorted(after_categories - before_categories)
+        after_score = calculate_score(after_hazards, [])
+
+        st.subheader("Before-and-After Results")
+        col1, col2, col3 = st.columns(3)
+        col1.metric("Before Score", f"{before.get('score', 0)}/100")
+        col2.metric("After Score", f"{after_score}/100")
+        change = after_score - int(before.get("score", 0) or 0)
+        col3.metric("Score Change", f"{change:+d} points")
+
+        groups = [("Hazards Resolved", resolved, st.success), ("Still Needs Attention", still_present, st.warning), ("New Hazards", new, st.error)]
+        for heading, categories, display in groups:
+            st.markdown(f"### {heading}")
+            if categories:
+                for category in categories:
+                    display(get_category_label(category))
+            else:
+                st.info("None found in this photo comparison.")
+
+        st.subheader("New Photo: Approximate Hazard Locations")
+        render_hazard_location_guide(saved_after.get("photo_bytes"), after_hazards)
+        if st.button("Use This New Check as Current Results"):
+            st.session_state["ai_result"] = after_result
+            st.session_state["uploaded_photo_bytes"] = saved_after.get("photo_bytes")
+            mark_new_room_check()
+            reset_checklist_progress()
+            go_to_page("checklist")
+
+    if st.button("← Back to Risk Score"):
+        go_to_page("risk_score")
+
+
 def show_saved_results_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Saved Checks by Home ID")
 
     st.caption(get_database_status_message())
@@ -1080,7 +1425,7 @@ def show_saved_results_page() -> None:
                 st.success("Check found.")
                 st.write(check)
 
-                details = fetch_room_check_details(check["id"])
+                details = fetch_room_check_details(check["id"], home_id)
                 with st.expander("Details"):
                     for detail in details:
                         st.write(detail)
@@ -1095,7 +1440,6 @@ def show_saved_results_page() -> None:
 def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
     hazard_counts = room_stats.get("hazard_counts", {})
     checklist_counts = room_stats.get("checklist_answer_counts", {})
-    fix_status_counts = room_stats.get("fix_status_counts", {})
     hazard_lines = [
         f"- {get_category_label(category)}: {count}"
         for category, count in sorted(hazard_counts.items(), key=lambda item: item[1], reverse=True)
@@ -1105,10 +1449,6 @@ def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
         f"- {answer}: {count}"
         for answer, count in sorted(checklist_counts.items())
     ] or ["- No saved checklist answers yet."]
-    fix_status_lines = [
-        f"- {status}: {count}"
-        for status, count in sorted(fix_status_counts.items())
-    ] or ["- No saved fix tracker statuses yet."]
 
     return f"""
 Room ID: {room_stats.get("room_id")}
@@ -1129,8 +1469,6 @@ Most Common Hazards:
 Checklist Answer Summary:
 {chr(10).join(checklist_lines)}
 
-Fix Tracker Summary:
-{chr(10).join(fix_status_lines)}
 """.strip()
 
 def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
@@ -1181,8 +1519,8 @@ def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
         return
 
     try:
-        before_details = fetch_room_check_details(before_check["id"])
-        after_details = fetch_room_check_details(after_check["id"])
+        before_details = fetch_room_check_details(before_check["id"], home_id)
+        after_details = fetch_room_check_details(after_check["id"], home_id)
     except Exception as error:
         st.error("Could not load check details for comparison.")
         with st.expander("Technical details"):
@@ -1367,7 +1705,7 @@ def show_room_health_trend_chart(home_id: str, room_id: str) -> None:
         key_prefix=f"trend_email_{safe_filename_part(room_id)}",
     )
 def show_room_stats_page() -> None:
-    st.title("🏠 AI SafeHome")
+    st.title("AI SafeHome")
     st.subheader("Room-by-Room Stats")
 
     st.caption(get_database_status_message())
@@ -1398,8 +1736,8 @@ def show_room_stats_page() -> None:
     total_checks = sum(room.get("check_count", 0) for room in room_stats_list)
 
     col1, col2 = st.columns(2)
-    col1.metric("Rooms Created", total_rooms)
-    col2.metric("Total Checks", total_checks)
+    col1.metric("Rooms Checked", sum(1 for room in room_stats_list if room.get("check_count", 0)))
+    col2.metric("Rooms Needing Attention", sum(1 for room in room_stats_list if room.get("latest_risk_level") in {"Moderate Risk", "High Risk"}))
 
     if not room_stats_list:
         st.info("No rooms have been created under this Home ID yet.")
@@ -1407,6 +1745,30 @@ def show_room_stats_page() -> None:
             reset_current_room_check()
             go_to_page("room_selection")
         return
+
+    all_hazard_counts: Dict[str, int] = {}
+    for room in room_stats_list:
+        for category, count in room.get("hazard_counts", {}).items():
+            all_hazard_counts[category] = all_hazard_counts.get(category, 0) + count
+    most_common_hazard = get_category_label(max(all_hazard_counts, key=all_hazard_counts.get)) if all_hazard_counts else "No hazards recorded yet"
+    rooms_without_checks = [room for room in room_stats_list if not room.get("check_count", 0)]
+    highest_score_room = max(room_stats_list, key=lambda room: room.get("latest_score") or 0)
+    next_room = rooms_without_checks[0] if rooms_without_checks else highest_score_room
+    improvement_rooms = [room for room in room_stats_list if room.get("check_count", 0) >= 2 and (room.get("latest_score") or 0) <= (room.get("average_score") or 0)]
+    latest_improvement = improvement_rooms[0].get("room_id") if improvement_rooms else "Save another check to track improvement"
+
+    st.subheader("Home Progress Dashboard")
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Most common hazard:</strong> {safe_text(most_common_hazard)}<br>
+            <strong>Latest improvement:</strong> {safe_text(latest_improvement)}<br>
+            <strong>Next room to check:</strong> {safe_text(next_room.get('room_id'))} — {safe_text(next_room.get('room_type'))}<br>
+            <span class="small-muted">Total saved checks: {total_checks}</span>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
     st.subheader("All Rooms")
 
@@ -1451,22 +1813,6 @@ def show_room_stats_page() -> None:
         """,
         unsafe_allow_html=True,
     )
-    st.subheader("Fix Tracker Summary")
-
-    fix_status_counts = selected_stats.get("fix_status_counts", {})
-
-    if fix_status_counts:
-        fix_rows = [
-            {
-                "Status": status,
-                "Count": count,
-            }
-            for status, count in sorted(fix_status_counts.items())
-        ]
-
-        st.dataframe(fix_rows, use_container_width=True, hide_index=True)
-    else:
-        st.info("No saved fix tracker statuses yet.")
     st.subheader("Most Common Hazards")
 
     hazard_counts = selected_stats.get("hazard_counts", {})
@@ -1520,6 +1866,7 @@ def show_room_stats_page() -> None:
         st.session_state["current_room_id"] = selected_room_id
         st.session_state["photo_uploaded"] = False
         st.session_state["ai_result"] = None
+        st.session_state["upload_nonce"] = st.session_state.get("upload_nonce", 0) + 1
         reset_checklist_progress()
         go_to_page("photo_upload")
 
@@ -1558,6 +1905,8 @@ def main() -> None:
         show_risk_score_page()
     elif current_page == "safety_report":
         show_safety_report_page()
+    elif current_page == "after_fixes_photo":
+        show_after_fixes_photo_page()
     elif current_page == "saved_results":
         show_saved_results_page()
     elif current_page == "room_stats":

@@ -8,7 +8,6 @@ from datetime import date
 from typing import Any, Dict, List
 from src.photo_quality import build_photo_quality_text
 import streamlit as st
-from src.fix_tracker import get_fix_tracker_text
 from src.constants import SAFETY_DISCLAIMER
 from src.fixes import build_top_fixes_text, get_recommended_first_fixes
 from src.priorities import get_priority_for_hazard
@@ -65,6 +64,7 @@ def build_report_text() -> str:
 
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
+    analysis_mode = ai_result.get("analysis_mode", "sample")
     checklist_answers = st.session_state.get("checklist_answers", [])
 
     score = st.session_state.get("score", 0)
@@ -79,7 +79,11 @@ def build_report_text() -> str:
         checklist_answers=checklist_answers,
         limit=5,
     )
-    fix_tracker_text = get_fix_tracker_text(fixes)
+    analysis_note = (
+        "Real AI analysis"
+        if analysis_mode == "real"
+        else "Sample analysis — these hazards are not findings from the uploaded photo."
+    )
     return f"""
 AI SafeHome Safety Report
 Date: {date.today().strftime('%B %d, %Y')}
@@ -89,6 +93,9 @@ Room Checked:
 
 Room ID:
 {room_id}
+
+Analysis Status:
+{analysis_note}
 
 Photo Quality:
 {photo_quality_text}
@@ -108,15 +115,10 @@ Checklist Concerns:
 Top 5 Fixes:
 {build_top_fixes_text(fixes)}
 
-Fix Tracker:
-{fix_tracker_text}
-
 Safety Disclaimer:
 {SAFETY_DISCLAIMER}
 
 Human Review Reminder:
 AI may miss hazards or misunderstand a photo. Please review the room yourself and consider asking a qualified professional for serious safety concerns.
 
-Privacy Reminder:
-This app should be tested with staged, non-patient photos only. Do not upload faces, names, addresses, mail, bills, medication bottles, or medical documents.
 """.strip()

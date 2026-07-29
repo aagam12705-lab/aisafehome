@@ -49,6 +49,13 @@ def analyze_uploaded_photo_quality(uploaded_file: Any) -> Dict[str, Any]:
         uploaded_file.seek(0)
         image = Image.open(uploaded_file)
         image.load()
+    except (OSError, ValueError):
+        return {
+            "label": "Unreadable",
+            "issues": ["The uploaded file could not be read as an image."],
+            "suggestions": ["Choose a valid JPG, PNG, or WEBP room photo and try again."],
+            "metrics": {},
+        }
     finally:
         uploaded_file.seek(current_position)
 

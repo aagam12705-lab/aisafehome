@@ -9,6 +9,10 @@ Does not store uploaded photos, names, addresses, medical history, or medication
 
 import os
 import re
+import hashlib
+import hmac
+import secrets
+from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 from dotenv import load_dotenv
@@ -87,20 +91,19 @@ def get_supabase_client():
 def normalize_home_id(home_id: Optional[str]) -> str:
     if not home_id:
         return ""
-    return str(home_id).strip().upper()
+    return " ".join(str(home_id).strip().split())
 
 
 def is_valid_home_id(home_id: Optional[str]) -> bool:
     normalized = normalize_home_id(home_id)
-    pattern = r"^HOME-[A-Z0-9]{4}-[A-Z0-9]{4}-[A-Z0-9]{4}$"
-    return re.match(pattern, normalized) is not None
+    return 1 <= len(normalized) <= 80
 
 
 def validate_home_id_or_raise(home_id: Optional[str]) -> str:
     normalized = normalize_home_id(home_id)
 
     if not is_valid_home_id(normalized):
-        raise RuntimeError("Invalid Home ID. Use a code like HOME-8K2M-Q9PA-W4ZT.")
+        raise RuntimeError("Enter a Home ID between 1 and 80 characters.")
 
     return normalized
 
@@ -115,7 +118,7 @@ def home_id_exists(home_id: str) -> bool:
     response = (
         client.table("homes")
         .select("home_id")
-        .eq("home_id", normalized_home_id)
+        .ilike("home_id", normalized_home_id)
         .limit(1)
         .execute()
     )
@@ -149,6 +152,70 @@ def create_home_id(home_id: str) -> str:
     return response.data[0]["home_id"]
 
 
+def validate_home_password(password: str) -> None:
+    if len(str(password or "")) < 8:
+        raise RuntimeError("Use a password with at least 8 characters.")
+
+
+def hash_home_password(password: str, salt: Optional[str] = None) -> str:
+    validate_home_password(password)
+    salt = salt or secrets.token_hex(16)
+    digest = hashlib.pbkdf2_hmac("sha256", password.encode(), salt.encode(), 300_000).hex()
+    return f"{salt}${digest}"
+
+
+def password_matches(password: str, stored_hash: Optional[str]) -> bool:
+    if not stored_hash or "$" not in stored_hash:
+        return False
+    salt, expected = stored_hash.split("$", 1)
+    actual = hashlib.pbkdf2_hmac("sha256", str(password).encode(), salt.encode(), 300_000).hex()
+    return hmac.compare_digest(actual, expected)
+
+
+def create_protected_home(home_id: str, password: str, recovery_email: str) -> str:
+    normalized = validate_home_id_or_raise(home_id)
+    if home_id_exists(normalized):
+        raise RuntimeError("That Home ID is already taken.")
+    response = get_supabase_client().table("homes").insert({
+        "home_id": normalized,
+        "password_hash": hash_home_password(password),
+        "recovery_email": str(recovery_email).strip().lower(),
+    }).execute()
+    if not response.data:
+        raise RuntimeError("Could not create Home ID.")
+    return response.data[0]["home_id"]
+
+
+def authenticate_home(home_id: str, password: str) -> bool:
+    normalized = validate_home_id_or_raise(home_id)
+    response = get_supabase_client().table("homes").select("password_hash").eq("home_id", normalized).limit(1).execute()
+    return bool(response.data) and password_matches(password, response.data[0].get("password_hash"))
+
+
+def create_password_reset_code(home_id: str) -> tuple[str, str]:
+    normalized = validate_home_id_or_raise(home_id)
+    response = get_supabase_client().table("homes").select("recovery_email").eq("home_id", normalized).limit(1).execute()
+    if not response.data or not response.data[0].get("recovery_email"):
+        raise RuntimeError("No recovery email is set for this Home ID.")
+    code = f"{secrets.randbelow(1_000_000):06d}"
+    expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
+    get_supabase_client().table("homes").update({"reset_code_hash": hashlib.sha256(code.encode()).hexdigest(), "reset_code_expires_at": expires_at}).eq("home_id", normalized).execute()
+    return str(response.data[0]["recovery_email"]), code
+
+
+def reset_home_password(home_id: str, code: str, new_password: str) -> None:
+    normalized = validate_home_id_or_raise(home_id)
+    response = get_supabase_client().table("homes").select("reset_code_hash,reset_code_expires_at").eq("home_id", normalized).limit(1).execute()
+    if not response.data:
+        raise RuntimeError("Invalid Home ID or reset code.")
+    row = response.data[0]
+    valid_code = hmac.compare_digest(str(row.get("reset_code_hash") or ""), hashlib.sha256(str(code).encode()).hexdigest())
+    expires_at = datetime.fromisoformat(str(row.get("reset_code_expires_at")).replace("Z", "+00:00")) if row.get("reset_code_expires_at") else datetime.min.replace(tzinfo=timezone.utc)
+    if not valid_code or expires_at < datetime.now(timezone.utc):
+        raise RuntimeError("The reset code is invalid or has expired.")
+    get_supabase_client().table("homes").update({"password_hash": hash_home_password(new_password), "reset_code_hash": None, "reset_code_expires_at": None}).eq("home_id", normalized).execute()
+
+
 # -----------------------------------------------------------------------------
 # Room IDs
 # -----------------------------------------------------------------------------
@@ -158,27 +225,19 @@ def normalize_room_id(room_id: Optional[str]) -> str:
     if not room_id:
         return ""
 
-    cleaned = str(room_id).strip().upper()
-    cleaned = cleaned.replace(" ", "-").replace("_", "-")
-    cleaned = re.sub(r"[^A-Z0-9-]", "", cleaned)
-    cleaned = re.sub(r"-+", "-", cleaned).strip("-")
-
-    return cleaned
+    return " ".join(str(room_id).strip().split())
 
 
 def is_valid_room_id(room_id: Optional[str]) -> bool:
     normalized = normalize_room_id(room_id)
-    pattern = r"^[A-Z0-9-]{2,40}$"
-    return re.match(pattern, normalized) is not None
+    return 1 <= len(normalized) <= 80
 
 
 def validate_room_id_or_raise(room_id: Optional[str]) -> str:
     normalized = normalize_room_id(room_id)
 
     if not is_valid_room_id(normalized):
-        raise RuntimeError(
-            "Invalid Room ID. Use something like BEDROOM-1, BEDROOM-2, or BATHROOM-1."
-        )
+        raise RuntimeError("Enter a Room ID between 1 and 80 characters.")
 
     return normalized
 
@@ -521,7 +580,21 @@ def save_room_check(
     )
 
     if detail_rows:
-        client.table("room_check_details").insert(detail_rows).execute()
+        try:
+            detail_response = client.table("room_check_details").insert(detail_rows).execute()
+
+            if not detail_response.data:
+                raise RuntimeError("Supabase did not return saved room-check details.")
+        except Exception as error:
+            # The current schema saves a parent check and its details separately.
+            # Remove the parent if the second write fails so incomplete checks do
+            # not affect saved-result lists or room statistics.
+            try:
+                client.table("room_checks").delete().eq("id", room_check_id).execute()
+            except Exception:
+                pass
+
+            raise RuntimeError("Could not save the complete room check.") from error
 
     return room_check_id
 
@@ -603,16 +676,33 @@ def fetch_room_check_by_id(
     return response.data[0]
 
 
-def fetch_room_check_details(room_check_id: str) -> List[Dict[str, Any]]:
+def fetch_room_check_details(
+    room_check_id: str,
+    home_id: str,
+) -> List[Dict[str, Any]]:
     if not is_database_enabled():
         return []
 
+    normalized_home_id = validate_home_id_or_raise(home_id)
+    normalized_check_id = str(room_check_id).strip()
     client = get_supabase_client()
+
+    parent_response = (
+        client.table("room_checks")
+        .select("id")
+        .eq("id", normalized_check_id)
+        .eq("home_id", normalized_home_id)
+        .limit(1)
+        .execute()
+    )
+
+    if not parent_response.data:
+        return []
 
     response = (
         client.table("room_check_details")
         .select("*")
-        .eq("room_check_id", str(room_check_id).strip())
+        .eq("room_check_id", normalized_check_id)
         .order("created_at", desc=False)
         .execute()
     )
@@ -620,11 +710,14 @@ def fetch_room_check_details(room_check_id: str) -> List[Dict[str, Any]]:
     return response.data or []
 
 
-def fetch_room_details_for_checks(room_check_ids: List[str]) -> List[Dict[str, Any]]:
+def fetch_room_details_for_checks(
+    room_check_ids: List[str],
+    home_id: str,
+) -> List[Dict[str, Any]]:
     detail_rows = []
 
     for room_check_id in room_check_ids:
-        detail_rows.extend(fetch_room_check_details(room_check_id))
+        detail_rows.extend(fetch_room_check_details(room_check_id, home_id))
 
     return detail_rows
 
@@ -775,7 +868,7 @@ def fetch_room_stats(home_id: str, room_id: str) -> Dict[str, Any]:
     )
 
     check_ids = [row["id"] for row in check_rows if row.get("id")]
-    detail_rows = fetch_room_details_for_checks(check_ids)
+    detail_rows = fetch_room_details_for_checks(check_ids, normalized_home_id)
 
     return build_room_stats_record(
         room_info=matching_room,
@@ -813,7 +906,7 @@ def fetch_all_room_stats_for_home(home_id: str) -> List[Dict[str, Any]]:
     for room_id, room_info in rooms_by_id.items():
         check_rows = [row for row in all_checks if row.get("room_id") == room_id]
         check_ids = [row["id"] for row in check_rows if row.get("id")]
-        detail_rows = fetch_room_details_for_checks(check_ids)
+        detail_rows = fetch_room_details_for_checks(check_ids, normalized_home_id)
 
         stats.append(
             build_room_stats_record(

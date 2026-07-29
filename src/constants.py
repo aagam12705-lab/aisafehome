@@ -46,7 +46,7 @@ ROOM_OPTIONS = [
 ]
 
 ALLOWED_FILE_TYPES = ["jpg", "jpeg", "png", "webp"]
-MAX_FILE_SIZE_MB = 5
+MAX_FILE_SIZE_MB = 30
 
 CATEGORY_LABELS = {
     "loose_rug": "Loose Rug or Mat",
@@ -97,6 +97,20 @@ HAZARD_POINTS = {
     "outdoor_surface": 12,
     "laundry_on_floor": 8,
     "open_drawers_cabinets": 8,
+}
+
+# Stable values used by the AI room-inspector rubric. These make identical
+# visible hazards score the same way across repeat checks, while HAZARD_POINTS
+# above remains the fallback for incomplete AI output.
+INSPECTOR_RISK_POINTS = {
+    "loose_rug": 15, "cords": 18, "clutter": 15, "poor_lighting": 12,
+    "slippery_floor": 22, "narrow_pathway": 15, "stairs": 22,
+    "handrail": 22, "bathroom_grab_bars": 22, "hard_to_reach_items": 8,
+    "threshold_trip": 18, "unstable_furniture": 15, "pet_items": 8,
+    "footwear": 8, "low_seating": 12, "poor_contrast": 10,
+    "uneven_floor": 22, "door_mat": 12, "furniture_in_path": 15,
+    "outdoor_surface": 18, "laundry_on_floor": 12,
+    "open_drawers_cabinets": 15, "unclear": 6,
 }
 
 GENERIC_RECOMMENDATIONS = {

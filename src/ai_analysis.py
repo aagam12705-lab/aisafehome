@@ -16,10 +16,15 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
-from src.constants import CATEGORY_LABELS
+from src.constants import CATEGORY_LABELS, HAZARD_POINTS, INSPECTOR_RISK_POINTS
 from src.priorities import get_priority_for_hazard
 
 load_dotenv()
+
+
+INSPECTOR_RUBRIC_TEXT = "\n".join(
+    f"- {category}: {points}" for category, points in INSPECTOR_RISK_POINTS.items()
+)
 
 
 SYSTEM_PROMPT = """
@@ -102,6 +107,14 @@ Judgment rules:
 - Only include more than 6 hazards if the image clearly contains many separate issues.
 - If the image quality is poor, say what could not be evaluated in not_visible.
 
+Hazard scoring rules — fixed room-inspector method:
+- Work like a careful home-safety inspector following a checklist, not like a person freely estimating risk.
+- First identify only hazards that are visible or strongly supported. Put uncertain items in follow-up questions instead of adding a new hazard.
+- Then assign each listed hazard the exact risk_points for its category from this table. Do not create a new score, raise it, lower it, or average it based on intuition.
+{INSPECTOR_RUBRIC_TEXT}
+- Score each separate hazard, even when two hazards have the same category. The app caps the final room score at 100.
+- For the same clearly visible hazard in the same photo, use the same category and exact score every time.
+
 Allowed categories:
 loose_rug, cords, clutter, poor_lighting, slippery_floor, narrow_pathway,
 stairs, handrail, bathroom_grab_bars, hard_to_reach_items, threshold_trip,
@@ -126,6 +139,10 @@ Return JSON in this exact format:
       "title": "short hazard title",
       "confidence": "high, medium, or low",
       "visibility": "visible, partly visible, or uncertain",
+      "risk_points": 1,
+      "location": "short location such as lower-left floor near the doorway",
+      "location_x": 50,
+      "location_y": 50,
       "evidence": "specific visual evidence, including 3D location such as foreground/background, left/center/right, floor/ankle/knee/waist level, and walking-path position",
       "explanation": "explain the hazard from the viewpoint of someone walking through the room",
       "recommendation": "simple practical fix",
@@ -135,9 +152,17 @@ Return JSON in this exact format:
   "not_visible": [
     "important safety factors that cannot be confirmed from this photo"
   ],
+  "checklist_questions": [
+    {
+      "category": "one allowed category",
+      "text": "one short yes/no question about an important uncertainty",
+      "reason": "why this needs a person to check in the real room"
+    }
+  ],
+  "skip_buffer_points": 0,
   "safety_reminder": "AI may miss hazards. Human review is recommended."
 }
-""".strip()
+""".replace("{INSPECTOR_RUBRIC_TEXT}", INSPECTOR_RUBRIC_TEXT).strip()
 
 
 ALLOWED_CATEGORIES = set(CATEGORY_LABELS.keys())
@@ -232,6 +257,7 @@ Output requirements:
 - Keep the summary short.
 - Each hazard must have one allowed category.
 - Each hazard must include confidence, visibility, evidence, explanation, recommendation, and human_review_reason.
+- Each hazard must include location_x and location_y as whole numbers from 0 to 100. They mark the center of the visible hazard in the photo (0,0 is top-left; 100,100 is bottom-right). Use the actual visual location, not a default position.
 - confidence must be exactly one of: high, medium, low.
 - visibility must be exactly one of: visible, partly visible, uncertain.
 - evidence should include the hazard's 3D location and what visual clue supports it.
@@ -241,6 +267,9 @@ Output requirements:
 - Do not mention people, names, addresses, medication bottles, private documents, or medical information.
 - Do not say the room is safe.
 - Do not guarantee fall prevention.
+- Create 0 to 6 checklist_questions only for important hazards you cannot confirm from the photo.
+- Each checklist question must be short, answerable with Yes, No, Not sure, or Not applicable, and use one allowed category.
+- Set skip_buffer_points from 0 to 15 based on the importance of the unanswered follow-up questions; use 0 when there are none.
 """.strip()
 
 def extract_json_from_text(text: str) -> Dict[str, Any]:
@@ -299,9 +328,33 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
         if category not in ALLOWED_CATEGORIES:
             category = "unclear"
 
+        try:
+            ai_risk_points = int(item.get("risk_points"))
+        except (TypeError, ValueError):
+            ai_risk_points = None
+
+        # Category values remain a reliable backup for older, sample, or
+        # incomplete AI responses that cannot provide a usable per-hazard score.
+        inspector_points = INSPECTOR_RISK_POINTS.get(category)
+        if ai_risk_points is None or not 1 <= ai_risk_points <= 25:
+            risk_points = int(HAZARD_POINTS.get(category, 8))
+            risk_points_source = "category backup"
+        else:
+            # Normalize the AI response to the fixed inspector table. This
+            # preserves a per-hazard score while eliminating free-form score
+            # variation for the same detected category.
+            risk_points = int(inspector_points or ai_risk_points)
+            risk_points_source = "AI room-inspector rubric"
+
         hazard = {
             "category": category,
             "title": str(item.get("title", "Possible hazard")).strip(),
+            "confidence": str(item.get("confidence", "medium")).strip().lower(),
+            "visibility": str(item.get("visibility", "uncertain")).strip().lower(),
+            "location": str(item.get("location", item.get("evidence", "General area of the room"))).strip(),
+            "evidence": str(item.get("evidence", "")).strip(),
+            "risk_points": risk_points,
+            "risk_points_source": risk_points_source,
             "explanation": str(
                 item.get("explanation", "This area may need human review.")
             ).strip(),
@@ -309,6 +362,18 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
                 item.get("recommendation", "Review this area carefully.")
             ).strip(),
         }
+
+        try:
+            location_x = int(item.get("location_x"))
+            location_y = int(item.get("location_y"))
+        except (TypeError, ValueError):
+            location_x = location_y = None
+        if location_x is not None and location_y is not None and 0 <= location_x <= 100 and 0 <= location_y <= 100:
+            hazard["location_x"] = location_x
+            hazard["location_y"] = location_y
+
+        if hazard["confidence"] not in {"high", "medium", "low"}:
+            hazard["confidence"] = "medium"
 
         hazard["priority"] = get_priority_for_hazard(hazard)
 
@@ -327,15 +392,48 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
             "Floor slipperiness cannot be fully confirmed from a photo.",
         ]
 
+    raw_questions = raw_result.get("checklist_questions", [])
+    if not isinstance(raw_questions, list):
+        raw_questions = []
+
+    checklist_questions = []
+    for index, item in enumerate(raw_questions[:6], start=1):
+        if not isinstance(item, dict):
+            continue
+        category = str(item.get("category", "unclear")).strip()
+        if category not in ALLOWED_CATEGORIES:
+            category = "unclear"
+        text = str(item.get("text", "")).strip()
+        if text:
+            checklist_questions.append({
+                "id": f"ai_follow_up_{index}",
+                "category": category,
+                "text": text,
+                "reason": str(item.get("reason", "Please check this in the real room.")).strip(),
+            })
+
+    try:
+        skip_buffer_points = int(raw_result.get("skip_buffer_points", 0))
+    except (TypeError, ValueError):
+        skip_buffer_points = 0
+    skip_buffer_points = max(0, min(skip_buffer_points, 15))
+    if not checklist_questions:
+        skip_buffer_points = 0
+
     return {
         "summary": summary or "AI SafeHome found possible room safety concerns.",
         "hazards": hazards,
         "not_visible": clean_not_visible,
+        "checklist_questions": checklist_questions,
+        "skip_buffer_points": skip_buffer_points,
         "safety_reminder": safety_reminder,
     }
 
 
-def get_fake_analysis(room_type: str) -> Dict[str, Any]:
+def get_fake_analysis(
+    room_type: str,
+    analysis_mode: str = "sample",
+) -> Dict[str, Any]:
     """
     Returns sample analysis for testing and fallback.
     """
@@ -347,18 +445,21 @@ def get_fake_analysis(room_type: str) -> Dict[str, Any]:
             "category": "cords",
             "title": "Cord near walking path",
             "explanation": "A cord near a walking area can create a tripping hazard.",
+            "location": "Lower center, along the walking path",
             "recommendation": "Move the cord along the wall or secure it with a cord cover.",
         },
         {
             "category": "loose_rug",
             "title": "Possible loose rug",
             "explanation": "A rug can slide or catch someone's foot if it does not have non-slip backing.",
+            "location": "Lower left floor area",
             "recommendation": "Use non-slip backing, tape down the edges, or remove the rug from the walking path.",
         },
         {
             "category": "clutter",
             "title": "Floor clutter",
             "explanation": "Objects on the floor can make walking paths harder to use safely.",
+            "location": "Lower right floor area",
             "recommendation": "Clear small objects, bags, shoes, or boxes from the walking path.",
         },
     ]
@@ -369,12 +470,14 @@ def get_fake_analysis(room_type: str) -> Dict[str, Any]:
                 "category": "bathroom_grab_bars",
                 "title": "Bathroom without visible grab bars",
                 "explanation": "This photo does not clearly show grab bars near bathroom areas.",
+                "location": "Near the toilet or shower area",
                 "recommendation": "Consider properly installed grab bars near the toilet, shower, or bathtub.",
             },
             {
                 "category": "slippery_floor",
                 "title": "Possible slippery floor area",
                 "explanation": "Bathroom floors can become slippery when wet.",
+                "location": "Floor area near the shower or sink",
                 "recommendation": "Use non-slip mats and keep the floor dry.",
             },
         ]
@@ -431,6 +534,7 @@ def get_fake_analysis(room_type: str) -> Dict[str, Any]:
         hazard["priority"] = get_priority_for_hazard(hazard)
 
     return {
+        "analysis_mode": analysis_mode,
         "summary": "Sample AI-style result. Use real AI mode later for actual photo analysis.",
         "hazards": hazards,
         "not_visible": [
@@ -438,6 +542,21 @@ def get_fake_analysis(room_type: str) -> Dict[str, Any]:
             "Floor slipperiness cannot be fully confirmed from one photo.",
             "Whether a rug has non-slip backing cannot be confirmed from a photo alone.",
         ],
+        "checklist_questions": [
+            {
+                "id": "ai_follow_up_1",
+                "category": "slippery_floor",
+                "text": "Is any part of the floor slippery or wet when the room is used?",
+                "reason": "A photo cannot confirm floor grip or moisture.",
+            },
+            {
+                "id": "ai_follow_up_2",
+                "category": "loose_rug",
+                "text": "Does each rug or mat stay firmly in place when stepped on?",
+                "reason": "Non-slip backing cannot be confirmed from one photo.",
+            },
+        ],
+        "skip_buffer_points": 8,
         "safety_reminder": "AI may miss hazards. Human review is recommended.",
     }
 
@@ -506,14 +625,16 @@ def analyze_photo(uploaded_file: Any, room_type: str) -> Dict[str, Any]:
     """
 
     if get_ai_mode() != "real":
-        return get_fake_analysis(room_type)
+        return get_fake_analysis(room_type, analysis_mode="sample")
 
     try:
-        return analyze_photo_with_openai(uploaded_file, room_type)
+        result = analyze_photo_with_openai(uploaded_file, room_type)
+        result["analysis_mode"] = "real"
+        return result
 
-    except Exception as error:
-        fallback = get_fake_analysis(room_type)
+    except Exception:
+        fallback = get_fake_analysis(room_type, analysis_mode="fallback")
         fallback["summary"] = (
-            f"Real AI analysis failed, so sample results are shown instead. Error: {error}"
+            "Real AI analysis is unavailable, so sample results are shown instead."
         )
         return fallback

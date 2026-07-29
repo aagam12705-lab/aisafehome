@@ -69,11 +69,6 @@ def show_email_summary_panel(
     key_prefix: str,
 ) -> None:
     with st.expander("Email this summary"):
-        st.warning(
-            "Only send privacy-safe summaries. Do not include names, addresses, "
-            "medical history, medication lists, faces, mail, bills, medication bottles, "
-            "or medical documents."
-        )
 
         st.caption(get_email_status_message())
 
@@ -98,21 +93,12 @@ def show_email_summary_panel(
             key=f"{key_prefix}_body",
         )
 
-        privacy_confirmed = st.checkbox(
-            "I confirm this email contains no personal, medical, or real patient information.",
-            key=f"{key_prefix}_privacy_confirmed",
-        )
-
         if is_email_enabled():
             if st.button(
                 "Send Email from AI SafeHome",
                 key=f"{key_prefix}_server_send",
                 type="primary",
             ):
-                if not privacy_confirmed:
-                    st.error("Confirm the privacy checkbox before sending.")
-                    return
-
                 try:
                     message_id = send_summary_email(
                         recipient_email=recipient,
@@ -158,11 +144,6 @@ def show_share_summary_panel(
     key_prefix: str,
 ) -> None:
     with st.expander("Share / export this summary"):
-        st.warning(
-            "Share only with people who should see this summary. "
-            "Do not add names, addresses, medical history, medication lists, faces, "
-            "mail, bills, medication bottles, or medical documents."
-        )
 
         export_text = f"{summary_title}\n\n{summary_text}\n\n{build_email_footer()}".strip()
 
