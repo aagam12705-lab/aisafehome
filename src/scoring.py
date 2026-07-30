@@ -19,7 +19,7 @@ def calculate_ai_points(ai_hazards: List[Dict[str, Any]]) -> float:
 
         # The category table remains the backup if a response is missing or
         # produces an unusable per-hazard assessment.
-        if not 1 <= points <= 25:
+        if not 1 <= points <= 20:
             points = int(HAZARD_POINTS.get(category, 8))
 
         total += points
@@ -34,7 +34,9 @@ def calculate_checklist_points(checklist_answers: List[Dict[str, Any]]) -> float
         points = get_points_for_category(answer.get("category")) * 0.8
         response = answer.get("answer")
 
-        if response == "yes":
+        # Follow-up questions are deliberately phrased as positive safety
+        # conditions. A "No" therefore identifies the possible concern.
+        if response == "no":
             total += points
         elif response == "not_sure":
             total += points * 0.35
@@ -73,7 +75,7 @@ def get_score_breakdown(
     ai_points = calculate_ai_points(ai_hazards)
     ai_assessed_hazards = sum(
         1 for hazard in ai_hazards
-        if hazard.get("risk_points_source") in {"AI assessment", "AI room-inspector rubric"}
+        if hazard.get("risk_points_source") in {"AI assessment", "AI severity assessment"}
     )
     backup_scored_hazards = max(0, len(ai_hazards) - ai_assessed_hazards)
     checklist_points = calculate_checklist_points(checklist_answers)

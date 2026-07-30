@@ -42,7 +42,7 @@ def get_recommended_first_fixes(
     checklist_concern_categories = {
         answer.get("category")
         for answer in checklist_answers
-        if answer.get("answer") in ["yes", "not_sure"] and answer.get("category")
+        if answer.get("answer") in ["no", "not_sure"] and answer.get("category")
     }
 
     overlapping_categories = ai_categories & checklist_concern_categories
@@ -70,7 +70,7 @@ def get_recommended_first_fixes(
         seen_recommendations.add(recommendation)
 
     for answer in checklist_answers:
-        if answer.get("answer") not in ["yes", "not_sure"]:
+        if answer.get("answer") not in ["no", "not_sure"]:
             continue
 
         category = answer.get("category") or "unclear"

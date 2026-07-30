@@ -16,22 +16,17 @@ from typing import Any, Dict, List, Optional
 
 from dotenv import load_dotenv
 
-from src.constants import CATEGORY_LABELS, HAZARD_POINTS, INSPECTOR_RISK_POINTS
+from src.constants import CATEGORY_LABELS, HAZARD_POINTS
 from src.priorities import get_priority_for_hazard
 
 load_dotenv()
-
-
-INSPECTOR_RUBRIC_TEXT = "\n".join(
-    f"- {category}: {points}" for category, points in INSPECTOR_RISK_POINTS.items()
-)
 
 
 SYSTEM_PROMPT = """
 You are AI SafeHome, an educational home fall-hazard review assistant.
 
 Your job:
-Analyze a staged room photo as if you are mentally walking through the room from the point of view of a person moving through it.
+Analyze a room photo as if you are mentally walking through the room from the point of view of a person moving through it.
 
 Important:
 You are NOT diagnosing a person.
@@ -107,13 +102,12 @@ Judgment rules:
 - Only include more than 6 hazards if the image clearly contains many separate issues.
 - If the image quality is poor, say what could not be evaluated in not_visible.
 
-Hazard scoring rules — fixed room-inspector method:
+Hazard scoring rules — severity-based room-inspector method:
 - Work like a careful home-safety inspector following a checklist, not like a person freely estimating risk.
 - First identify only hazards that are visible or strongly supported. Put uncertain items in follow-up questions instead of adding a new hazard.
-- Then assign each listed hazard the exact risk_points for its category from this table. Do not create a new score, raise it, lower it, or average it based on intuition.
-{INSPECTOR_RUBRIC_TEXT}
+- Score each separate hazard from 1 to 20 based on its visible severity in the walking path: 1–4 = minor or off-path concern; 5–8 = low trip/slip concern; 9–12 = clear concern in a walking path; 13–16 = serious likely trip/slip concern; 17–20 = urgent, high-consequence concern such as a wet walking surface, unsafe stairs, or missing reliable hand support.
+- Use the same severity band for the same clearly visible hazard in the same photo. Do not inflate a score just because the category sounds serious.
 - Score each separate hazard, even when two hazards have the same category. The app caps the final room score at 100.
-- For the same clearly visible hazard in the same photo, use the same category and exact score every time.
 
 Allowed categories:
 loose_rug, cords, clutter, poor_lighting, slippery_floor, narrow_pathway,
@@ -162,7 +156,7 @@ Return JSON in this exact format:
   "skip_buffer_points": 0,
   "safety_reminder": "AI may miss hazards. Human review is recommended."
 }
-""".replace("{INSPECTOR_RUBRIC_TEXT}", INSPECTOR_RUBRIC_TEXT).strip()
+""".strip()
 
 
 ALLOWED_CATEGORIES = set(CATEGORY_LABELS.keys())
@@ -236,7 +230,7 @@ def build_user_prompt(room_type: str) -> str:
 Room type selected by user:
 {room_type}
 
-Analyze this staged room photo for possible fall hazards.
+Analyze this room photo for possible fall hazards.
 
 Use the 3D walkthrough method:
 - Imagine entering the room from the camera viewpoint.
@@ -268,6 +262,9 @@ Output requirements:
 - Do not say the room is safe.
 - Do not guarantee fall prevention.
 - Create 0 to 6 checklist_questions only for important hazards you cannot confirm from the photo.
+- Phrase every checklist question as a positive safety condition, so that answering No means the problem is present. Example: "Is the walking path clear and free of obstacles?"
+- Use simple everyday English. Keep each checklist question short and avoid technical terms.
+- For lighting, ask: "Does the room have adequate lighting at night?"
 - Each checklist question must be short, answerable with Yes, No, Not sure, or Not applicable, and use one allowed category.
 - Set skip_buffer_points from 0 to 15 based on the importance of the unanswered follow-up questions; use 0 when there are none.
 """.strip()
@@ -335,16 +332,12 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
 
         # Category values remain a reliable backup for older, sample, or
         # incomplete AI responses that cannot provide a usable per-hazard score.
-        inspector_points = INSPECTOR_RISK_POINTS.get(category)
-        if ai_risk_points is None or not 1 <= ai_risk_points <= 25:
+        if ai_risk_points is None or not 1 <= ai_risk_points <= 20:
             risk_points = int(HAZARD_POINTS.get(category, 8))
             risk_points_source = "category backup"
         else:
-            # Normalize the AI response to the fixed inspector table. This
-            # preserves a per-hazard score while eliminating free-form score
-            # variation for the same detected category.
-            risk_points = int(inspector_points or ai_risk_points)
-            risk_points_source = "AI room-inspector rubric"
+            risk_points = ai_risk_points
+            risk_points_source = "AI severity assessment"
 
         hazard = {
             "category": category,
@@ -404,6 +397,8 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
         if category not in ALLOWED_CATEGORIES:
             category = "unclear"
         text = str(item.get("text", "")).strip()
+        if category == "poor_lighting":
+            text = "Does the room have adequate lighting at night?"
         if text:
             checklist_questions.append({
                 "id": f"ai_follow_up_{index}",
@@ -530,8 +525,10 @@ def get_fake_analysis(
             },
         ]
 
-    for hazard in hazards:
+    sample_coordinates = [(25, 72), (72, 72), (50, 56), (25, 35), (75, 35), (50, 22)]
+    for index, hazard in enumerate(hazards):
         hazard["priority"] = get_priority_for_hazard(hazard)
+        hazard["location_x"], hazard["location_y"] = sample_coordinates[index % len(sample_coordinates)]
 
     return {
         "analysis_mode": analysis_mode,
@@ -546,7 +543,7 @@ def get_fake_analysis(
             {
                 "id": "ai_follow_up_1",
                 "category": "slippery_floor",
-                "text": "Is any part of the floor slippery or wet when the room is used?",
+                "text": "Is the floor dry and not slippery when the room is used?",
                 "reason": "A photo cannot confirm floor grip or moisture.",
             },
             {

@@ -4,6 +4,7 @@ comparison.py
 Before/after comparison helpers for AI SafeHome.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List, Set
 
 
@@ -12,12 +13,21 @@ def sort_checks_oldest_to_newest(checks: List[Dict[str, Any]]) -> List[Dict[str,
 
 
 def get_check_display_label(check: Dict[str, Any]) -> str:
-    check_id = str(check.get("id", ""))[:8]
-    created_at = str(check.get("created_at", "Unknown time")).replace("T", " ")
+    created_at = format_check_datetime(check.get("created_at"))
     score = check.get("score", "Unknown")
     risk_level = check.get("risk_level", "Unknown")
 
-    return f"{created_at} | {score}/100 | {risk_level} | {check_id}"
+    return f"{created_at} — Score {score}/100 — {risk_level}"
+
+
+def format_check_datetime(value: Any) -> str:
+    if not value:
+        return "Unknown date"
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.strftime("%b %-d, %Y at %-I:%M %p UTC")
+    except (TypeError, ValueError):
+        return str(value).replace("T", " ").replace("+00:00", " UTC")
 
 
 def get_ai_hazard_details(details: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -111,12 +121,12 @@ AI SafeHome Before/After Room Comparison
 Before:
 Score: {before_score}/100
 Risk Label: {before_check.get("risk_level", "Unknown")}
-Saved At: {before_check.get("created_at", "Unknown")}
+Checked: {format_check_datetime(before_check.get("created_at"))}
 
 After:
 Score: {after_score}/100
 Risk Label: {after_check.get("risk_level", "Unknown")}
-Saved At: {after_check.get("created_at", "Unknown")}
+Checked: {format_check_datetime(after_check.get("created_at"))}
 
 Score Change:
 {get_score_change_message(before_check, after_check)}

@@ -7,6 +7,7 @@ Reusable Streamlit UI helpers and styling for AI SafeHome.
 import html
 import json
 import re
+from datetime import datetime
 from typing import Any, Dict, Optional
 
 import streamlit as st
@@ -194,6 +195,48 @@ def add_mobile_friendly_style() -> None:
             line-height:1.4;
         }}
 
+        .safe-table-wrap {{
+            overflow-x:auto;
+            margin:1rem 0;
+            border:1px solid var(--safe-border);
+            border-radius:14px;
+            background:var(--safe-card);
+        }}
+
+        .safe-table {{
+            width:100%;
+            border-collapse:collapse;
+            min-width:520px;
+            color:var(--safe-text);
+        }}
+
+        .safe-table th {{
+            background:var(--safe-primary);
+            color:var(--safe-primary-text) !important;
+            text-align:left;
+            padding:.85rem 1rem;
+            font-weight:800;
+        }}
+
+        .safe-table td {{
+            padding:.8rem 1rem;
+            border-top:1px solid var(--safe-border);
+            color:var(--safe-text) !important;
+            vertical-align:top;
+        }}
+
+        .safe-table tr:nth-child(even) td {{
+            background:var(--safe-surface);
+        }}
+
+        [data-testid="stArrowVegaLiteChart"] {{
+            background:var(--safe-card);
+            border:1px solid var(--safe-border);
+            border-radius:14px;
+            padding:.5rem;
+            margin:1rem 0;
+        }}
+
         div[role="radiogroup"] label {{
             border:1px solid var(--safe-border);
             border-radius:12px;
@@ -261,6 +304,15 @@ def add_mobile_friendly_style() -> None:
             color:var(--safe-text) !important;
             background-color:var(--safe-input) !important;
             border-color:var(--safe-border) !important;
+        }}
+
+        input:disabled,
+        textarea:disabled,
+        [data-baseweb="input"] input:disabled {{
+            color:var(--safe-text) !important;
+            -webkit-text-fill-color:var(--safe-text) !important;
+            opacity:1 !important;
+            background-color:var(--safe-input) !important;
         }}
 
         input::placeholder,
@@ -459,7 +511,7 @@ def add_mobile_friendly_style() -> None:
 
 
 def show_accessibility_panel() -> None:
-    with st.expander("⚙️ Accessibility", expanded=True):
+    with st.expander("⚙️ Accessibility", expanded=False):
         st.caption("Choose a text size and color setting. Your choice applies right away.")
         st.selectbox(
             "Text size",
@@ -510,11 +562,117 @@ def safe_text(value: Any) -> str:
     return html.escape(str(value))
 
 
+def render_styled_table(rows: list[Dict[str, Any]]) -> None:
+    """Render saved data in the same high-contrast-safe style as app cards."""
+    if not rows:
+        return
+
+    columns = list(rows[0].keys())
+    header_html = "".join(f"<th>{safe_text(column)}</th>" for column in columns)
+    body_html = "".join(
+        "<tr>" + "".join(
+            f"<td>{safe_text(row.get(column, ''))}</td>" for column in columns
+        ) + "</tr>"
+        for row in rows
+    )
+    st.markdown(
+        f'<div class="safe-table-wrap"><table class="safe-table"><thead><tr>{header_html}</tr></thead><tbody>{body_html}</tbody></table></div>',
+        unsafe_allow_html=True,
+    )
+
+
+def render_score_trend_chart(rows: list[Dict[str, Any]]) -> None:
+    """Render a readable, themed SVG trend chart instead of Streamlit's default chart."""
+    if not rows:
+        return
+
+    points: list[tuple[int, int]] = []
+    for row in rows:
+        try:
+            points.append((int(row.get("Check Number", 0)), max(0, min(int(row.get("Score", 0)), 100))))
+        except (TypeError, ValueError):
+            continue
+    if not points:
+        return
+
+    scheme = st.session_state.get("color_scheme", "System")
+    use_system_theme = scheme == "System"
+    if scheme == "High Contrast":
+        background, text, grid, line, point = "#000000", "#ffffff", "#ffffff", "#ffff00", "#00ffff"
+    elif scheme == "Dark":
+        background, text, grid, line, point = "#1f2937", "#f8fafc", "#94a3b8", "#7dd3fc", "#facc15"
+    else:
+        background, text, grid, line, point = "#ffffff", "#111827", "#94a3b8", "#075985", "#1d4ed8"
+
+    width, height = 720, 310
+    left, right, top, bottom = 56, 24, 28, 52
+    plot_width, plot_height = width - left - right, height - top - bottom
+    count = len(points)
+
+    def x_position(index: int) -> float:
+        return left + (plot_width / max(count - 1, 1)) * index
+
+    def y_position(score: int) -> float:
+        return top + plot_height * (1 - score / 100)
+
+    coordinates = [(x_position(index), y_position(score)) for index, (_number, score) in enumerate(points)]
+    path = " ".join(
+        f"{'M' if index == 0 else 'L'} {x:.1f} {y:.1f}"
+        for index, (x, y) in enumerate(coordinates)
+    )
+    grid_lines = "".join(
+        f'<line class="chart-grid" x1="{left}" y1="{y_position(level):.1f}" x2="{width-right}" y2="{y_position(level):.1f}" stroke="{grid}" stroke-width="1" opacity="0.55" />'
+        f'<text class="chart-text" x="{left-12}" y="{y_position(level)+5:.1f}" fill="{text}" font-size="13" text-anchor="end">{level}</text>'
+        for level in (0, 50, 100)
+    )
+    point_shapes = "".join(
+        f'<circle class="chart-point" cx="{x:.1f}" cy="{y:.1f}" r="6" fill="{point}" stroke="{background}" stroke-width="3" />'
+        f'<text class="chart-score" x="{x:.1f}" y="{min(y + 25, height - 42):.1f}" fill="{text}" font-size="14" font-weight="700" text-anchor="middle">{score}/100</text>'
+        f'<text class="chart-text" x="{x:.1f}" y="{height-20}" fill="{text}" font-size="13" text-anchor="middle">Check {number}</text>'
+        for (number, score), (x, y) in zip(points, coordinates)
+    )
+
+    system_theme_css = ""
+    if use_system_theme:
+        system_theme_css = """
+        @media (prefers-color-scheme: dark) {
+          .chart-shell { background:#1f2937 !important; border-color:#94a3b8 !important; }
+          .chart-text, .chart-score { fill:#f8fafc !important; }
+          .chart-grid { stroke:#94a3b8 !important; }
+          .chart-line { stroke:#7dd3fc !important; }
+          .chart-point { fill:#facc15 !important; stroke:#1f2937 !important; }
+        }
+        """
+
+    components.html(
+        f"""
+        <style>
+          .chart-shell {{ background:{background}; border:2px solid {grid}; border-radius:16px; padding:12px; }}
+          {system_theme_css}
+        </style>
+        <div class="chart-shell">
+          <svg viewBox="0 0 {width} {height}" width="100%" role="img" aria-label="Room risk score trend">
+            <text class="chart-text" x="{left}" y="18" fill="{text}" font-size="17" font-weight="700">Risk score over time</text>
+            {grid_lines}
+            <path class="chart-line" d="{path}" fill="none" stroke="{line}" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" />
+            {point_shapes}
+          </svg>
+        </div>
+        """,
+        height=350,
+        scrolling=False,
+    )
+
+
 def format_database_datetime(value: Any) -> str:
     if not value:
-        return "Unknown time"
+        return "Unknown date"
 
-    return str(value).replace("T", " ").replace("+00:00", " UTC")
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.strftime("%b %-d, %Y at %-I:%M %p UTC")
+    except (TypeError, ValueError):
+        return str(value).replace("T", " ").replace("+00:00", " UTC")
 
 
 def get_category_label(category: Optional[str]) -> str:
@@ -537,13 +695,11 @@ def show_step_card(step_text: str) -> None:
 
 
 def show_current_home_and_room_status() -> None:
-    home_id = st.session_state.get("home_id")
     room_id = st.session_state.get("current_room_id")
 
     st.markdown(
         f"""
         <div class="plain-card">
-            <strong>Home ID:</strong> {safe_text(home_id or "Not selected")}<br>
             <strong>Room ID:</strong> {safe_text(room_id or "Not selected")}
         </div>
         """,
@@ -567,10 +723,6 @@ def render_hazard_card(hazard: Dict[str, Any], number: int) -> None:
     with st.container(border=True):
         st.caption(f"Hazard {number} · {category_label}")
         st.subheader(str(hazard.get("title", "Possible hazard")))
-        st.caption(
-            f"Hazard score: {hazard.get('risk_points', 0)}/25 "
-            f"({hazard.get('risk_points_source', 'category backup')})"
-        )
 
         if priority == "Fix Now":
             st.error(f"Priority: {priority}")
@@ -595,18 +747,49 @@ def show_score_explanation_card(score_breakdown: Dict[str, Any]) -> None:
         score_breakdown.get("total_before_cap", 0),
     )
 
+    with st.expander("Score breakdown", expanded=False):
+        st.markdown(
+            f"""
+            <div class="plain-card">
+                <strong>Why this score?</strong><br><br>
+                AI hazard points: {safe_text(score_breakdown.get("ai_points", 0))} ({safe_text(score_breakdown.get("ai_assessed_hazards", 0))} AI-assessed, {safe_text(score_breakdown.get("backup_scored_hazards", 0))} category backup)<br>
+                Checklist concern points: {safe_text(score_breakdown.get("checklist_points", 0))}<br>
+                Skipped follow-up buffer: {safe_text(score_breakdown.get("skip_buffer_points", 0))}<br>
+                Raw score before cap: {safe_text(raw_score)}<br>
+                Final score: {safe_text(score_breakdown.get("final_score", 0))}/100<br>
+                Risk label: {safe_text(score_breakdown.get("risk_level", "Unknown"))}<br><br>
+                Higher score = more possible fall hazards.<br>
+                Lower score = fewer possible fall hazards.
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+
+def show_risk_score_bar(score: Any) -> None:
+    """Shows the 0–100 risk score as both a number and a clear severity bar."""
+    try:
+        value = max(0, min(int(score), 100))
+    except (TypeError, ValueError):
+        value = 0
+
+    if value < 30:
+        color, label = "#15803d", "Low risk"
+    elif value < 60:
+        color, label = "#b45309", "Moderate risk"
+    else:
+        color, label = "#b91c1c", "High risk"
+
     st.markdown(
         f"""
-        <div class="plain-card">
-            <strong>Why this score?</strong><br><br>
-            AI hazard points: {safe_text(score_breakdown.get("ai_points", 0))} ({safe_text(score_breakdown.get("ai_assessed_hazards", 0))} AI-assessed, {safe_text(score_breakdown.get("backup_scored_hazards", 0))} category backup)<br>
-            Checklist concern points: {safe_text(score_breakdown.get("checklist_points", 0))}<br>
-            Skipped follow-up buffer: {safe_text(score_breakdown.get("skip_buffer_points", 0))}<br>
-            Raw score before cap: {safe_text(raw_score)}<br>
-            Final score: {safe_text(score_breakdown.get("final_score", 0))}/100<br>
-            Risk label: {safe_text(score_breakdown.get("risk_level", "Unknown"))}<br><br>
-            Higher score = more possible fall hazards.<br>
-            Lower score = fewer possible fall hazards.
+        <div class="plain-card" aria-label="Risk score {value} out of 100, {label}">
+            <strong>Risk score: {value}/100 — {label}</strong>
+            <div style="height:18px; background:#d1d5db; border-radius:999px; margin-top:.65rem; overflow:hidden; border:1px solid #64748b;">
+                <div style="height:100%; width:{value}%; min-width:{'4px' if value else '0'}; background:{color}; border-radius:999px;"></div>
+            </div>
+            <div style="display:flex; justify-content:space-between; font-size:.85em; margin-top:.3rem;">
+                <span>Low</span><span>Moderate</span><span>High</span>
+            </div>
         </div>
         """,
         unsafe_allow_html=True,

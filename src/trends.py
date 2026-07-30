@@ -20,10 +20,9 @@ def build_score_trend_rows(checks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         rows.append(
             {
                 "Check Number": index,
-                "Saved At": str(check.get("created_at", "Unknown")).replace("T", " "),
+                "Checked": str(check.get("created_at", "Unknown")).replace("T", " "),
                 "Score": int(check.get("score") or 0),
                 "Risk Label": check.get("risk_level", "Unknown"),
-                "Check ID": check.get("id", ""),
             }
         )
 
@@ -79,7 +78,7 @@ def build_trend_summary_text(room_id: str, checks: List[Dict[str, Any]]) -> str:
     for row in rows:
         lines.append(
             f"- Check {row['Check Number']}: {row['Score']}/100, "
-            f"{row['Risk Label']}, saved at {row['Saved At']}"
+            f"{row['Risk Label']}, checked at {row['Checked']}"
         )
 
     return f"""

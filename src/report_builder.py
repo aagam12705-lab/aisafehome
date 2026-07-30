@@ -43,7 +43,7 @@ def build_checklist_lines(checklist_answers: List[Dict[str, Any]]) -> str:
     lines = []
 
     for answer in checklist_answers:
-        if answer.get("answer") in ["yes", "not_sure"] or answer.get("answer_label") == "Skipped":
+        if answer.get("answer") in ["no", "not_sure"] or answer.get("answer_label") == "Skipped":
             lines.append(
                 f"- {answer.get('question')} Answer: {answer.get('answer_label')}"
             )

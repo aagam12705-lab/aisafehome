@@ -39,7 +39,7 @@ def analyze_uploaded_photo_quality(uploaded_file: Any) -> Dict[str, Any]:
         return {
             "label": "No photo",
             "issues": ["No photo was uploaded."],
-            "suggestions": ["Upload a staged room photo."],
+            "suggestions": ["Upload a clear room photo."],
             "metrics": {},
         }
 

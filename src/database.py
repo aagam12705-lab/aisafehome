@@ -1,11 +1,4 @@
-"""
-database.py
-
-Supabase database helpers for AI SafeHome.
-
-Stores anonymous room-check results only.
-Does not store uploaded photos, names, addresses, medical history, or medication data.
-"""
+"""Supabase database helpers for AI SafeHome."""
 
 import os
 import re
@@ -18,6 +11,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 from dotenv import load_dotenv
 
 load_dotenv()
+
+ACCOUNT_EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 
 
 def get_env_value(name: str, default: Optional[str] = None) -> Optional[str]:
@@ -45,8 +40,8 @@ def is_database_enabled() -> bool:
 
 def get_database_status_message() -> str:
     if is_database_enabled():
-        return "Database saving is enabled."
-    return "Database saving is disabled."
+        return "Saving is available."
+    return "Saving is not available right now."
 
 
 def get_ai_mode() -> str:
@@ -62,7 +57,7 @@ def get_app_version() -> str:
 
 def get_supabase_client():
     if not is_database_enabled():
-        raise RuntimeError("Database saving is disabled.")
+        raise RuntimeError("Saving is not available right now.")
 
     supabase_url = get_env_value("SUPABASE_URL")
     supabase_key = get_env_value("SUPABASE_SERVICE_ROLE_KEY")
@@ -84,26 +79,26 @@ def get_supabase_client():
 
 
 # -----------------------------------------------------------------------------
-# Home IDs
+# Account IDs (the database column keeps its original name for compatibility)
 # -----------------------------------------------------------------------------
 
 
 def normalize_home_id(home_id: Optional[str]) -> str:
     if not home_id:
         return ""
-    return " ".join(str(home_id).strip().split())
+    return str(home_id).strip().lower()
 
 
 def is_valid_home_id(home_id: Optional[str]) -> bool:
     normalized = normalize_home_id(home_id)
-    return 1 <= len(normalized) <= 80
+    return 3 <= len(normalized) <= 80 and ACCOUNT_EMAIL_PATTERN.fullmatch(normalized) is not None
 
 
 def validate_home_id_or_raise(home_id: Optional[str]) -> str:
     normalized = normalize_home_id(home_id)
 
     if not is_valid_home_id(normalized):
-        raise RuntimeError("Enter a Home ID between 1 and 80 characters.")
+        raise RuntimeError("Enter a valid account email address.")
 
     return normalized
 
@@ -136,18 +131,18 @@ def is_home_id_available(home_id: str) -> bool:
 
 def create_home_id(home_id: str) -> str:
     if not is_database_enabled():
-        raise RuntimeError("Database saving is disabled.")
+        raise RuntimeError("Saving is not available right now.")
 
     normalized_home_id = validate_home_id_or_raise(home_id)
 
     if home_id_exists(normalized_home_id):
-        raise RuntimeError("That Home ID is already taken.")
+        raise RuntimeError("An account already exists with that email address.")
 
     client = get_supabase_client()
     response = client.table("homes").insert({"home_id": normalized_home_id}).execute()
 
     if not response.data:
-        raise RuntimeError("Could not create Home ID.")
+        raise RuntimeError("Could not create the account.")
 
     return response.data[0]["home_id"]
 
@@ -175,14 +170,14 @@ def password_matches(password: str, stored_hash: Optional[str]) -> bool:
 def create_protected_home(home_id: str, password: str, recovery_email: str) -> str:
     normalized = validate_home_id_or_raise(home_id)
     if home_id_exists(normalized):
-        raise RuntimeError("That Home ID is already taken.")
+        raise RuntimeError("An account already exists with that email address.")
     response = get_supabase_client().table("homes").insert({
         "home_id": normalized,
         "password_hash": hash_home_password(password),
         "recovery_email": str(recovery_email).strip().lower(),
     }).execute()
     if not response.data:
-        raise RuntimeError("Could not create Home ID.")
+        raise RuntimeError("Could not create the account.")
     return response.data[0]["home_id"]
 
 
@@ -196,7 +191,7 @@ def create_password_reset_code(home_id: str) -> tuple[str, str]:
     normalized = validate_home_id_or_raise(home_id)
     response = get_supabase_client().table("homes").select("recovery_email").eq("home_id", normalized).limit(1).execute()
     if not response.data or not response.data[0].get("recovery_email"):
-        raise RuntimeError("No recovery email is set for this Home ID.")
+        raise RuntimeError("No email address is available for this account.")
     code = f"{secrets.randbelow(1_000_000):06d}"
     expires_at = (datetime.now(timezone.utc) + timedelta(minutes=15)).isoformat()
     get_supabase_client().table("homes").update({"reset_code_hash": hashlib.sha256(code.encode()).hexdigest(), "reset_code_expires_at": expires_at}).eq("home_id", normalized).execute()
@@ -207,7 +202,7 @@ def reset_home_password(home_id: str, code: str, new_password: str) -> None:
     normalized = validate_home_id_or_raise(home_id)
     response = get_supabase_client().table("homes").select("reset_code_hash,reset_code_expires_at").eq("home_id", normalized).limit(1).execute()
     if not response.data:
-        raise RuntimeError("Invalid Home ID or reset code.")
+        raise RuntimeError("Invalid email address or reset code.")
     row = response.data[0]
     valid_code = hmac.compare_digest(str(row.get("reset_code_hash") or ""), hashlib.sha256(str(code).encode()).hexdigest())
     expires_at = datetime.fromisoformat(str(row.get("reset_code_expires_at")).replace("Z", "+00:00")) if row.get("reset_code_expires_at") else datetime.min.replace(tzinfo=timezone.utc)
@@ -319,10 +314,10 @@ def create_home_room(
     normalized_room_id = validate_room_id_or_raise(room_id)
 
     if not home_id_exists(normalized_home_id):
-        raise RuntimeError("Home ID does not exist yet.")
+        raise RuntimeError("This account does not exist yet.")
 
     if room_id_exists(normalized_home_id, normalized_room_id):
-        raise RuntimeError("That Room ID already exists under this Home ID.")
+        raise RuntimeError("That Room ID already exists in this account.")
 
     client = get_supabase_client()
 
@@ -543,7 +538,7 @@ def save_room_check(
 
         if not home_room:
             raise RuntimeError(
-                "Room ID does not exist under this Home ID. Create or choose the room before saving."
+                "Room ID does not exist in this account. Create or choose the room before saving."
             )
 
         home_room_id = home_room.get("id")

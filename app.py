@@ -1,7 +1,5 @@
 import importlib
 import io
-import secrets
-import string
 from typing import Any, Dict, List, Optional
 
 # Streamlit can retain an earlier version of a helper module after a source
@@ -12,12 +10,18 @@ import src.constants as _constants_module
 import src.ai_analysis as _ai_analysis_module
 import src.scoring as _scoring_module
 import src.ui as _ui_module
+import src.comparison as _comparison_module
+import src.trends as _trends_module
+import src.email_ui as _email_ui_module
 
 importlib.reload(_database_module)
 importlib.reload(_constants_module)
 importlib.reload(_ai_analysis_module)
 importlib.reload(_scoring_module)
 importlib.reload(_ui_module)
+importlib.reload(_comparison_module)
+importlib.reload(_trends_module)
+importlib.reload(_email_ui_module)
 
 from src.comparison import (
     build_before_after_summary_text,
@@ -27,7 +31,7 @@ from src.comparison import (
     sort_checks_oldest_to_newest,
 )
 import streamlit as st
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageOps
 from src.trends import (
     build_score_trend_rows,
     build_trend_summary_text,
@@ -48,22 +52,18 @@ from src.database import (
     authenticate_home,
     create_password_reset_code,
     create_protected_home,
-    create_home_id,
     create_home_room,
     fetch_all_room_stats_for_home,
-    fetch_room_check_by_id,
     fetch_room_check_details,
     fetch_room_checks_by_home_id,
     fetch_room_checks_by_room_id,
     fetch_room_stats,
     fetch_rooms_for_home,
     fetch_summary_stats_for_home,
-    get_database_status_message,
     get_next_room_id,
     home_id_exists,
     is_database_enabled,
     is_home_id_available,
-    is_valid_home_id,
     reset_home_password,
     save_room_check,
 )
@@ -78,12 +78,15 @@ from src.ui import (
     format_database_datetime,
     get_category_label,
     render_hazard_card,
+    render_score_trend_chart,
+    render_styled_table,
     safe_filename_part,
     safe_text,
     setup_page,
     show_accessibility_panel,
     show_current_home_and_room_status,
     show_read_aloud_button,
+    show_risk_score_bar,
     show_score_explanation_card,
     show_step_card,
 )
@@ -175,7 +178,7 @@ def reset_current_room_check() -> None:
     st.session_state["upload_nonce"] = st.session_state.get("upload_nonce", 0) + 1
 
 # -----------------------------------------------------------------------------
-# Home ID helpers
+# Account helpers (stored internally as home_id for database compatibility)
 # -----------------------------------------------------------------------------
 
 
@@ -183,14 +186,6 @@ def clean_home_id_input(home_id: Optional[str]) -> str:
     if not home_id:
         return ""
     return " ".join(str(home_id).strip().split())
-
-
-def generate_home_id() -> str:
-    alphabet = string.ascii_uppercase + string.digits
-    return "HOME-" + "-".join(
-        "".join(secrets.choice(alphabet) for _ in range(4))
-        for _ in range(3)
-    )
 
 
 def get_logged_in_home_id() -> Optional[str]:
@@ -205,12 +200,10 @@ def log_out_home_id() -> None:
 
 
 def log_in_with_home_id(home_id: str, password: str) -> bool:
-    cleaned = clean_home_id_input(home_id)
+    cleaned = clean_home_id_input(home_id).lower()
 
-    if not is_valid_home_id(cleaned):
-        st.session_state["home_login_error"] = (
-            "Enter a Home ID between 1 and 80 characters."
-        )
+    if not is_valid_email_address(cleaned):
+        st.session_state["home_login_error"] = "Enter a valid email address."
         st.session_state["home_login_message"] = None
         return False
 
@@ -218,101 +211,71 @@ def log_in_with_home_id(home_id: str, password: str) -> bool:
         exists = authenticate_home(cleaned, password)
     except Exception as error:
         st.session_state["home_login_error"] = (
-            "Could not check this Home ID. Check your database connection."
+            "Could not sign in right now. Please try again."
         )
         st.session_state["home_login_message"] = str(error)
         return False
 
     if not exists:
         st.session_state["home_login_error"] = (
-            "The Home ID or password is incorrect."
+            "The email address or password is incorrect."
         )
         st.session_state["home_login_message"] = None
         return False
 
     st.session_state["home_id"] = cleaned
     st.session_state["home_login_error"] = None
-    st.session_state["home_login_message"] = "Home ID login successful."
+    st.session_state["home_login_message"] = "Signed in successfully."
     return True
 
 
-def create_random_available_home_id() -> str:
-    if not is_database_enabled():
-        raise RuntimeError("Database saving is disabled, so a Home ID cannot be created.")
+def create_custom_home_id(email: str, password: str) -> bool:
+    cleaned = clean_home_id_input(email).lower()
 
-    for _ in range(10):
-        candidate = generate_home_id()
-
-        if is_home_id_available(candidate):
-            created = create_home_id(candidate)
-            st.session_state["home_id"] = created
-            st.session_state["last_created_home_id"] = created
-            st.session_state["home_login_error"] = None
-            st.session_state["home_login_message"] = "New Home ID created."
-            return created
-
-    raise RuntimeError("Could not create a unique Home ID. Try again.")
-
-
-def create_custom_home_id(home_id: str, password: str, recovery_email: str) -> bool:
-    cleaned = clean_home_id_input(home_id)
-
-    if not is_valid_home_id(cleaned):
-        st.session_state["home_login_error"] = (
-            "Enter a Home ID between 1 and 80 characters."
-        )
+    if not is_valid_email_address(cleaned):
+        st.session_state["home_login_error"] = "Enter a valid email address."
         return False
 
     try:
         if not is_home_id_available(cleaned):
             st.session_state["home_login_error"] = (
-                "That Home ID is already taken. Choose a different one."
+                "An account already exists with that email address."
             )
             return False
 
-        if not is_valid_email_address(recovery_email):
-            st.session_state["home_login_error"] = "Enter a valid recovery email."
-            return False
-        created = create_protected_home(cleaned, password, recovery_email)
+        created = create_protected_home(cleaned, password, cleaned)
         st.session_state["home_id"] = created
         st.session_state["last_created_home_id"] = created
         st.session_state["home_login_error"] = None
-        st.session_state["home_login_message"] = "Custom Home ID created."
+        st.session_state["home_login_message"] = "User account created."
         return True
 
     except Exception as error:
         st.session_state["home_login_error"] = (
-            f"Could not create this Home ID: {error}"
+            f"Could not create this user account: {error}"
         )
         st.session_state["home_login_message"] = None
         return False
 
 
-def show_home_id_status(key_suffix: str = "main") -> None:
+def show_home_id_status(key_suffix: str = "main", allow_logout: bool = False) -> None:
     home_id = get_logged_in_home_id()
 
     if home_id:
-        st.success(f"Logged in with Home ID: {home_id}")
+        st.success(f"Signed in as: {home_id}")
 
-        if st.button("Log Out of Home ID", key=f"log_out_home_id_{key_suffix}"):
+        if allow_logout and st.button("Log Out", key=f"log_out_home_id_{key_suffix}"):
             log_out_home_id()
             st.rerun()
-    else:
-        st.info("No Home ID is logged in yet.")
 
 
 def show_home_id_login_box(key_prefix: str = "home_id") -> None:
-    st.subheader("Home ID Login")
-    st.write(
-        "Choose a Home ID to save and view checks for one home."
-    )
-
-
-    st.caption(get_database_status_message())
+    st.subheader("Sign In")
+    st.write("Use your email and password to save and view room checks.")
 
     if not is_database_enabled():
         st.info(
-            "Database saving is disabled. Enable DATABASE_ENABLED=true before creating or using Home IDs."
+            "Saved room checks are not available right now."
         )
         return
 
@@ -322,73 +285,50 @@ def show_home_id_login_box(key_prefix: str = "home_id") -> None:
     if st.session_state.get("home_login_message"):
         st.info(st.session_state["home_login_message"])
 
-    tab1, tab2 = st.tabs(["Create Home ID", "Log In / Recover Password"])
+    tab1, tab2 = st.tabs(["Use Existing Account", "Create New Account"])
 
     with tab1:
-        custom = st.text_input(
-            "Choose a Home ID",
-            placeholder="My Home",
-            key=f"{key_prefix}_custom",
-        )
-        password = st.text_input("Create password", type="password", key=f"{key_prefix}_password")
-        recovery_email = st.text_input("Recovery email", key=f"{key_prefix}_recovery_email")
-
-        if st.button("Check Availability", key=f"{key_prefix}_check"):
-            try:
-                if not is_valid_home_id(custom):
-                    st.error("Enter a Home ID between 1 and 80 characters.")
-                elif is_home_id_available(custom):
-                    st.success("This Home ID is available.")
-                else:
-                    st.error("This Home ID is already taken.")
-            except Exception as error:
-                st.error("Could not check availability.")
-                with st.expander("Technical details"):
-                    st.code(str(error))
-
-        if st.button(
-            "Create This Home ID",
-            key=f"{key_prefix}_create_custom",
-            type="primary",
-        ):
-            if create_custom_home_id(custom, password, recovery_email):
-                st.success(f"Created Home ID: {st.session_state['home_id']}")
-                st.rerun()
-
-    with tab2:
         existing = st.text_input(
-            "Enter existing Home ID",
-            placeholder="My Home",
+            "Email address",
+            placeholder="name@example.com",
             key=f"{key_prefix}_existing",
         )
         password = st.text_input("Password", type="password", key=f"{key_prefix}_login_password")
 
-        if st.button(
-            "Log In with Home ID",
-            key=f"{key_prefix}_login",
-            type="primary",
-        ):
+        if st.button("Sign In", key=f"{key_prefix}_login", type="primary"):
             if log_in_with_home_id(existing, password):
-                st.success("Home ID login successful.")
+                st.success("Signed in successfully.")
                 st.rerun()
 
         with st.expander("Forgot password?"):
-            reset_home = st.text_input("Home ID", key=f"{key_prefix}_reset_home")
             if st.button("Email Reset Code", key=f"{key_prefix}_send_reset"):
                 try:
-                    email, code = create_password_reset_code(reset_home)
+                    email, code = create_password_reset_code(existing)
                     send_summary_email(email, "AI SafeHome password reset", f"Your reset code is {code}. It expires in 15 minutes.")
-                    st.success("A reset code was sent.")
+                    st.success("A reset code was sent to this account's email address.")
                 except Exception as error:
                     st.error(str(error))
             reset_code = st.text_input("Reset code", key=f"{key_prefix}_reset_code")
             new_password = st.text_input("New password", type="password", key=f"{key_prefix}_new_password")
             if st.button("Reset Password", key=f"{key_prefix}_reset_password"):
                 try:
-                    reset_home_password(reset_home, reset_code, new_password)
-                    st.success("Password reset. You can now log in.")
+                    reset_home_password(existing, reset_code, new_password)
+                    st.success("Password reset. You can now sign in.")
                 except Exception as error:
                     st.error(str(error))
+
+    with tab2:
+        custom = st.text_input(
+            "Email address",
+            placeholder="name@example.com",
+            key=f"{key_prefix}_custom",
+        )
+        password = st.text_input("Create password", type="password", key=f"{key_prefix}_password")
+
+        if st.button("Create Account", key=f"{key_prefix}_create_custom", type="primary"):
+            if create_custom_home_id(custom, password):
+                st.success("Account created.")
+                st.rerun()
 
 
 # -----------------------------------------------------------------------------
@@ -406,6 +346,25 @@ def validate_uploaded_photo(uploaded_file: Any) -> tuple[bool, str]:
         return False, f"File is too large. Maximum size is {MAX_FILE_SIZE_MB} MB."
 
     return True, ""
+
+
+def load_oriented_image(uploaded_file: Any) -> Image.Image:
+    """Open an uploaded photo and apply its camera orientation before display or AI use."""
+    uploaded_file.seek(0)
+    image = Image.open(uploaded_file)
+    image = ImageOps.exif_transpose(image)
+    image.load()
+    return image.copy()
+
+
+def oriented_image_file(image: Image.Image) -> io.BytesIO:
+    """Provide the same upright pixels to both preview and analysis."""
+    buffer = io.BytesIO()
+    image.convert("RGB").save(buffer, format="JPEG", quality=95)
+    buffer.seek(0)
+    buffer.name = "upright_room_photo.jpg"
+    buffer.type = "image/jpeg"
+    return buffer
 
 
 def get_current_database_save_payload() -> Dict[str, Any]:
@@ -444,16 +403,14 @@ def get_current_database_save_payload() -> Dict[str, Any]:
 def show_database_save_panel() -> None:
     st.subheader("Save Result")
 
-    st.caption(get_database_status_message())
-
     if not is_database_enabled():
-        st.info("Database saving is disabled.")
+        st.info("Saving is not available right now.")
         return
 
     home_id = get_logged_in_home_id()
 
     if not home_id:
-        st.warning("Create or log in with a Home ID before saving.")
+        st.warning("Create or sign in to an account before saving.")
         show_home_id_login_box(key_prefix="save_panel_home")
         return
 
@@ -466,12 +423,12 @@ def show_database_save_panel() -> None:
         return
 
     if st.session_state.get("database_save_complete"):
-        st.success(f"This check is in your room stats. Check ID: {st.session_state.get('database_save_id')}")
+        st.success("This check is in your room stats.")
         if st.button("View Updated Room Stats"):
             go_to_page("room_stats")
         return
 
-    st.success(f"Saving under Home ID {home_id} and Room ID {room_id}")
+    st.success(f"Saving to your account for Room ID {room_id}")
 
     if st.button("Save Result", type="primary"):
 
@@ -496,7 +453,7 @@ def show_database_save_panel() -> None:
             st.session_state["database_save_complete"] = True
             st.session_state["database_save_id"] = saved_id
 
-            st.success(f"Saved. Check ID: {saved_id}")
+            st.success("Saved to your room stats.")
 
         except Exception as error:
             st.error("Could not save this result.")
@@ -558,7 +515,7 @@ def show_landing_page() -> None:
         <div class="plain-card">
             <strong>How it works</strong><br><br>
             1. Choose one room.<br>
-            2. Upload a staged room photo.<br>
+            2. Upload a room photo.<br>
             3. Review possible hazards and answer simple questions.<br>
             4. Read your score, suggested fixes, and safety report.
         </div>
@@ -566,19 +523,14 @@ def show_landing_page() -> None:
         unsafe_allow_html=True,
     )
 
-    show_home_id_status(key_suffix="landing")
+    show_home_id_status(key_suffix="landing", allow_logout=True)
 
     if st.button("Start Safety Check", type="primary"):
         reset_current_room_check()
         st.session_state["quick_mode"] = False
         go_to_page("room_selection")
 
-    if st.button("Quick Safety Check"):
-        reset_current_room_check()
-        st.session_state["quick_mode"] = True
-        go_to_page("room_selection")
-
-    if st.button("Access Saved Checks by Home ID"):
+    if get_logged_in_home_id() and st.button("My Saved Room Checks"):
         go_to_page("saved_results")
 
     if st.button("View Room-by-Room Stats"):
@@ -589,7 +541,7 @@ def show_room_selection_page() -> None:
     st.title("AI SafeHome")
     st.subheader("Step 1: Choose a Room")
     if st.session_state.get("quick_mode"):
-        show_step_card("Quick Safety Check — Choose the room. No account or Room ID is needed unless you decide to save later.")
+        show_step_card("Continue without signing in — Choose the room. No account or Room ID is needed unless you decide to save later.")
     else:
         show_step_card("Step 1 of 6 — Choose the room you want to check.")
 
@@ -625,9 +577,9 @@ def show_room_id_selection_page() -> None:
     st.info("Room IDs keep repeated rooms separate, like BEDROOM-1 and BEDROOM-2.")
 
     if not is_database_enabled():
-        st.warning("Database saving is disabled, so this check will not be attached to a Room ID.")
+        st.warning("Saved room checks are not available right now.")
 
-        if st.button("Continue Without Room ID →", type="primary"):
+        if st.button("Continue Without Signing In →", type="primary", key="room_id_continue_without_signin_disabled"):
             st.session_state["current_room_id"] = None
             st.session_state["current_home_room_id"] = None
             go_to_page("photo_upload")
@@ -637,35 +589,28 @@ def show_room_id_selection_page() -> None:
     home_id = get_logged_in_home_id()
 
     if not home_id:
-        st.warning("Create or log in with a Home ID before choosing a Room ID.")
-        show_home_id_login_box(key_prefix="room_id_page_home")
+        st.warning("Sign in to save this room, or continue without signing in.")
 
-        if st.button("Continue Without Database Room Tracking"):
+        if st.button("Continue Without Signing In →", type="primary", key="room_id_continue_without_signin"):
             st.session_state["current_room_id"] = None
             st.session_state["current_home_room_id"] = None
             go_to_page("photo_upload")
 
-        return
+        st.divider()
+        show_home_id_login_box(key_prefix="room_id_page_home")
 
-    show_home_id_status(key_suffix="room_id_page")
+        return
 
     try:
         existing_rooms = fetch_rooms_for_home(home_id=home_id, room_type=room_type)
         suggested_room_id = get_next_room_id(home_id=home_id, room_type=room_type)
     except Exception as error:
-        st.error("Could not load rooms for this Home ID.")
+        st.error("Could not load your saved rooms.")
         with st.expander("Technical details"):
             st.code(str(error))
         return
 
-    if existing_rooms:
-        st.write(f"Existing {room_type} rooms:")
-        for room in existing_rooms:
-            st.write(f"- {room.get('room_id')}")
-    else:
-        st.info(f"No existing {room_type} rooms found for this Home ID yet.")
-
-    tab1, tab2 = st.tabs(["Use Existing Room", "Create New Room"])
+    tab1, tab2 = st.tabs(["Use Existing Room ID", "Create New Room ID"])
 
     with tab1:
         if not existing_rooms:
@@ -761,41 +706,29 @@ def render_hazard_location_guide(image_bytes: Optional[bytes], hazards: List[Dic
     except (OSError, ValueError):
         return
 
-    positions = [
-        (0.25, 0.72), (0.72, 0.72), (0.50, 0.56), (0.25, 0.35),
-        (0.75, 0.35), (0.50, 0.22), (0.12, 0.55), (0.88, 0.55),
-    ]
     draw = ImageDraw.Draw(image)
     radius = max(18, min(image.size) // 22)
+    plotted_hazards = 0
 
     for index, hazard in enumerate(hazards[:8], start=1):
-        location = f"{hazard.get('location', '')} {hazard.get('evidence', '')}".lower()
-        x_ratio, y_ratio = positions[index - 1]
         if isinstance(hazard.get("location_x"), int) and isinstance(hazard.get("location_y"), int):
             x_ratio = hazard["location_x"] / 100
             y_ratio = hazard["location_y"] / 100
-        elif "left" in location:
-            x_ratio = 0.22
-        elif "right" in location:
-            x_ratio = 0.78
-        if any(word in location for word in ("floor", "lower", "foreground", "ankle")):
-            y_ratio = 0.74
-        elif any(word in location for word in ("upper", "background", "wall", "high")):
-            y_ratio = 0.30
+        else:
+            continue
 
         x, y = int(image.width * x_ratio), int(image.height * y_ratio)
         draw.ellipse((x - radius, y - radius, x + radius, y + radius), outline="#2563eb", width=max(3, radius // 6))
-        draw.ellipse((x - radius // 2, y - radius // 2, x + radius // 2, y + radius // 2), fill="#ffffff", outline="#2563eb", width=2)
         draw.text((x - radius // 4, y - radius // 2), str(index), fill="#1e3a8a")
+        plotted_hazards += 1
 
-    st.image(image, caption="AI-marked hazard locations. Each numbered circle matches the hazard card below.", use_container_width=True)
-    for index, hazard in enumerate(hazards[:8], start=1):
-        st.caption(f"{index}. {hazard.get('location') or hazard.get('evidence') or 'Approximate area shown by the marker.'}")
+    if plotted_hazards:
+        st.image(image, caption="AI-marked hazard locations. Each numbered circle matches the hazard card below.", width="stretch")
 
 def show_photo_upload_page() -> None:
     st.title("AI SafeHome")
     st.subheader("Step 2: Upload Room Photo")
-    show_step_card("Step 2 of 6 — Upload or take a staged room photo.")
+    show_step_card("Step 2 of 6 — Upload or take a room photo.")
 
     room_type = st.session_state.get("room_type")
 
@@ -830,27 +763,26 @@ def show_photo_upload_page() -> None:
             return
 
         try:
-            image = Image.open(uploaded_file)
-            image.load()
+            image = load_oriented_image(uploaded_file)
+            analysis_file = oriented_image_file(image)
         except (OSError, ValueError):
             st.error("This file could not be read as an image. Choose a valid JPG, PNG, or WEBP photo.")
             uploaded_file.seek(0)
             return
 
-        st.image(image, caption=f"Preview of uploaded {room_type} photo", use_container_width=True)
-        uploaded_file.seek(0)
-        st.session_state["uploaded_photo_bytes"] = uploaded_file.getvalue()
-        uploaded_file.seek(0)
+        st.image(image, caption=f"Preview of uploaded {room_type} photo", width="stretch")
+        st.session_state["uploaded_photo_bytes"] = analysis_file.getvalue()
+        analysis_file.seek(0)
 
         st.session_state["photo_uploaded"] = True
         st.success("Photo uploaded successfully.")
-        quality = analyze_uploaded_photo_quality(uploaded_file)
+        quality = analyze_uploaded_photo_quality(analysis_file)
         st.session_state["photo_quality"] = quality
         show_photo_quality_card(quality)
-        uploaded_file.seek(0)
         if st.button("Analyze Photo →", type="primary"):
             with st.spinner("Analyzing photo..."):
-                ai_result = analyze_photo(uploaded_file, room_type)
+                analysis_file.seek(0)
+                ai_result = analyze_photo(analysis_file, room_type)
 
                 for hazard in ai_result.get("hazards", []):
                     hazard["priority"] = hazard.get("priority") or get_priority_for_hazard(hazard)
@@ -878,24 +810,7 @@ def show_ai_results_page() -> None:
 
     st.write(ai_result.get("summary", "No summary available."))
 
-    urgent_hazards = [
-        hazard for hazard in hazards
-        if (hazard.get("priority") or get_priority_for_hazard(hazard)) == "Fix Now"
-    ]
-    if urgent_hazards:
-        st.error("Address this first: urgent possible safety hazards.")
-        for hazard in urgent_hazards[:3]:
-            st.write(
-                f"**{hazard.get('title', 'Possible hazard')}** — "
-                f"{hazard.get('recommendation', 'Review this area right away.')}"
-            )
-
     read_aloud_text = "AI results. " + str(ai_result.get("summary", ""))
-    if urgent_hazards:
-        read_aloud_text += " Urgent safety alert. " + " ".join(
-            f"{hazard.get('title', 'Possible hazard')}. {hazard.get('recommendation', '')}"
-            for hazard in urgent_hazards[:3]
-        )
     show_read_aloud_button(read_aloud_text, "ai_results")
 
     if hazards:
@@ -994,6 +909,7 @@ def show_checklist_page() -> None:
     st.progress((index + 1) / len(questions))
     st.write(f"Follow-up question {index + 1} of {len(questions)}")
     st.markdown(f"### {question['text']}")
+    st.caption("Answer No if this safety condition is not met.")
     if question.get("reason"):
         st.caption(f"Why we are asking: {question['reason']}")
 
@@ -1072,6 +988,7 @@ def show_checklist_summary_page() -> None:
 
     st.metric("Risk Score", f"{score}/100")
     st.write(f"Risk label: **{risk_level}**")
+    show_risk_score_bar(score)
 
     show_score_explanation_card(score_breakdown)
 
@@ -1176,6 +1093,7 @@ def show_risk_score_page() -> None:
 
     st.metric("Risk Score", f"{score}/100")
     st.write(f"Risk label: **{risk_level}**")
+    show_risk_score_bar(score)
 
     show_score_explanation_card(score_breakdown)
     show_current_check_comparison()
@@ -1185,7 +1103,7 @@ def show_risk_score_page() -> None:
     show_top_5_fixes(limit=3 if quick_mode else 5)
 
     if quick_mode:
-        st.info("Quick Safety Check stays private to this browser session unless you choose to save it.")
+        st.info("This check stays in this browser session unless you choose to save it.")
         if st.button("Save This Check"):
             st.session_state["quick_mode"] = False
             go_to_page("room_id_selection")
@@ -1270,7 +1188,7 @@ def show_after_fixes_photo_page() -> None:
     st.subheader("Photo Comparison After Fixes")
     show_step_card("Take a new photo of the same room after making changes. AI SafeHome will compare possible hazards from both photos.")
 
-    st.image(before["photo_bytes"], caption="Before: original room photo", use_container_width=True)
+    st.image(before["photo_bytes"], caption="Before: original room photo", width="stretch")
     after_photo = st.file_uploader(
         "Upload or take one new room photo (30 MB maximum)",
         type=ALLOWED_FILE_TYPES,
@@ -1291,24 +1209,23 @@ def show_after_fixes_photo_page() -> None:
         return
 
     try:
-        after_image = Image.open(after_photo)
-        after_image.load()
+        after_image = load_oriented_image(after_photo)
+        after_analysis_file = oriented_image_file(after_image)
     except (OSError, ValueError):
         st.error("This file could not be read as an image. Choose a valid JPG, PNG, or WEBP photo.")
         return
 
-    st.image(after_image, caption="After: new room photo", use_container_width=True)
-    after_photo.seek(0)
-
+    st.image(after_image, caption="After: new room photo", width="stretch")
     if st.button("Analyze and Compare Photos", type="primary"):
         with st.spinner("Analyzing the new photo and comparing results..."):
-            after_result = analyze_photo(after_photo, st.session_state.get("room_type") or "Other")
+            after_analysis_file.seek(0)
+            after_result = analyze_photo(after_analysis_file, st.session_state.get("room_type") or "Other")
             after_hazards = after_result.get("hazards", [])
             for hazard in after_hazards:
                 hazard["priority"] = hazard.get("priority") or get_priority_for_hazard(hazard)
         st.session_state["after_fix_result"] = {
             "result": after_result,
-            "photo_bytes": after_photo.getvalue(),
+            "photo_bytes": after_analysis_file.getvalue(),
         }
 
     saved_after = st.session_state.get("after_fix_result") or {}
@@ -1354,17 +1271,13 @@ def show_after_fixes_photo_page() -> None:
 
 def show_saved_results_page() -> None:
     st.title("AI SafeHome")
-    st.subheader("Saved Checks by Home ID")
-
-    st.caption(get_database_status_message())
+    st.subheader("My Saved Room Checks")
 
     if not is_database_enabled():
-        st.info("Database saving is disabled.")
+        st.info("Saved room checks are not available right now.")
         if st.button("← Back to Landing Page"):
             go_to_page("landing")
         return
-
-    show_home_id_status(key_suffix="saved_results")
 
     if not get_logged_in_home_id():
         show_home_id_login_box(key_prefix="saved_page_home_id")
@@ -1387,48 +1300,25 @@ def show_saved_results_page() -> None:
     col3.metric("Most Common Room", stats.get("most_common_room") or "None")
 
     st.divider()
-    st.subheader("Checks Saved Under This Home ID")
+    st.subheader("My Saved Checks")
 
     if not rows:
-        st.info("No checks have been saved under this Home ID yet.")
+        st.info("No checks have been saved to your account yet.")
     else:
         for index, row in enumerate(rows, start=1):
             st.markdown(
                 f"""
                 <div class="plain-card">
                     <strong>Check {index}</strong><br>
-                    Check ID: {safe_text(row.get("id"))}<br>
                     Room: {safe_text(row.get("room_type"))}<br>
                     Room ID: {safe_text(row.get("room_id") or "No Room ID")}<br>
                     Score: {safe_text(row.get("score"))}/100<br>
                     Risk Label: {safe_text(row.get("risk_level"))}<br>
-                    Saved At: {safe_text(format_database_datetime(row.get("created_at")))}
+                    Checked: {safe_text(format_database_datetime(row.get("created_at")))}
                 </div>
                 """,
                 unsafe_allow_html=True,
             )
-
-    st.divider()
-    st.subheader("Look Up One Check by Check ID")
-
-    check_id = st.text_input("Enter Check ID")
-
-    if st.button("Find Check by ID"):
-        if not check_id.strip():
-            st.error("Enter a Check ID first.")
-        else:
-            check = fetch_room_check_by_id(check_id, home_id)
-
-            if not check:
-                st.error("No check found for that Check ID under this Home ID.")
-            else:
-                st.success("Check found.")
-                st.write(check)
-
-                details = fetch_room_check_details(check["id"], home_id)
-                with st.expander("Details"):
-                    for detail in details:
-                        st.write(detail)
 
     if st.button("View Room-by-Room Stats"):
         go_to_page("room_stats")
@@ -1555,20 +1445,16 @@ def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
     col2.metric("After Score", f"{after_score}/100")
     col3.metric("Change", get_score_change_message(before_check, after_check))
 
-    st.markdown(
-        f"""
-        <div class="plain-card">
-            <strong>Before:</strong><br>
-            Saved At: {safe_text(format_database_datetime(before_check.get("created_at")))}<br>
-            Risk Label: {safe_text(before_check.get("risk_level"))}<br><br>
-
-            <strong>After:</strong><br>
-            Saved At: {safe_text(format_database_datetime(after_check.get("created_at")))}<br>
-            Risk Label: {safe_text(after_check.get("risk_level"))}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
+    with st.container(border=True):
+        st.write("**Before**")
+        st.write(f"Checked: {format_database_datetime(before_check.get('created_at'))}")
+        st.write(f"Score: {before_score}/100")
+        st.write(f"Risk label: {before_check.get('risk_level', 'Unknown')}")
+        st.divider()
+        st.write("**After**")
+        st.write(f"Checked: {format_database_datetime(after_check.get('created_at'))}")
+        st.write(f"Score: {after_score}/100")
+        st.write(f"Risk label: {after_check.get('risk_level', 'Unknown')}")
 
     col_a, col_b, col_c = st.columns(3)
 
@@ -1668,17 +1554,9 @@ def show_room_health_trend_chart(home_id: str, room_id: str) -> None:
         for row in trend_rows
     ]
 
-    st.line_chart(
-        chart_rows,
-        x="Check Number",
-        y="Score",
-    )
+    render_score_trend_chart(chart_rows)
 
-    st.dataframe(
-        trend_rows,
-        use_container_width=True,
-        hide_index=True,
-    )
+    render_styled_table(trend_rows)
 
     trend_text = build_trend_summary_text(room_id, checks)
 
@@ -1708,15 +1586,11 @@ def show_room_stats_page() -> None:
     st.title("AI SafeHome")
     st.subheader("Room-by-Room Stats")
 
-    st.caption(get_database_status_message())
-
     if not is_database_enabled():
-        st.info("Database saving is disabled.")
+        st.info("Saved room checks are not available right now.")
         if st.button("← Back to Landing Page"):
             go_to_page("landing")
         return
-
-    show_home_id_status(key_suffix="room_stats")
 
     if not get_logged_in_home_id():
         show_home_id_login_box(key_prefix="room_stats_home")
@@ -1735,12 +1609,10 @@ def show_room_stats_page() -> None:
     total_rooms = len(room_stats_list)
     total_checks = sum(room.get("check_count", 0) for room in room_stats_list)
 
-    col1, col2 = st.columns(2)
-    col1.metric("Rooms Checked", sum(1 for room in room_stats_list if room.get("check_count", 0)))
-    col2.metric("Rooms Needing Attention", sum(1 for room in room_stats_list if room.get("latest_risk_level") in {"Moderate Risk", "High Risk"}))
+    st.metric("Rooms Checked", sum(1 for room in room_stats_list if room.get("check_count", 0)))
 
     if not room_stats_list:
-        st.info("No rooms have been created under this Home ID yet.")
+        st.info("No rooms have been added to your account yet.")
         if st.button("Start New Safety Check"):
             reset_current_room_check()
             go_to_page("room_selection")
@@ -1786,7 +1658,7 @@ def show_room_stats_page() -> None:
             }
         )
 
-    st.dataframe(table_rows, use_container_width=True, hide_index=True)
+    render_styled_table(table_rows)
 
     room_options = {
         f"{room.get('room_id')} — {room.get('room_type')}": room.get("room_id")
@@ -1813,19 +1685,17 @@ def show_room_stats_page() -> None:
         """,
         unsafe_allow_html=True,
     )
+
     st.subheader("Most Common Hazards")
 
     hazard_counts = selected_stats.get("hazard_counts", {})
 
     if hazard_counts:
         hazard_rows = [
-            {
-                "Hazard": get_category_label(category),
-                "Count": count,
-            }
-            for category, count in sorted(hazard_counts.items(), key=lambda item: item[1], reverse=True)
+            {"Hazard": get_category_label(category)}
+            for category, _count in sorted(hazard_counts.items(), key=lambda item: item[1], reverse=True)
         ]
-        st.dataframe(hazard_rows, use_container_width=True, hide_index=True)
+        render_styled_table(hazard_rows)
     else:
         st.info("No saved hazards yet.")
 
@@ -1834,19 +1704,16 @@ def show_room_stats_page() -> None:
     history_rows = fetch_room_checks_by_room_id(home_id, selected_room_id, limit=100)
 
     if history_rows:
-        st.dataframe(
+        render_styled_table(
             [
                 {
-                    "Saved At": format_database_datetime(row.get("created_at")),
-                    "Check ID": row.get("id"),
+                    "Checked": format_database_datetime(row.get("created_at")),
                     "Score": row.get("score"),
                     "Risk Label": row.get("risk_level"),
                     "Hazards": row.get("hazard_count"),
                 }
                 for row in history_rows
-            ],
-            use_container_width=True,
-            hide_index=True,
+            ]
         )
     else:
         st.info("No check history for this room yet.")
@@ -1886,6 +1753,11 @@ def main() -> None:
     show_accessibility_panel()
 
     current_page = st.session_state.get("page", "landing")
+
+    # Keep a predictable exit route on every workflow screen; signing out remains
+    # intentionally limited to the landing page.
+    if current_page != "landing" and st.button("← Back to Landing Page", key="global_back_to_landing"):
+        go_to_page("landing")
 
     if current_page == "landing":
         show_landing_page()
