@@ -4,6 +4,7 @@ ui.py
 Reusable Streamlit UI helpers and styling for AI SafeHome.
 """
 
+import base64
 import html
 import json
 import re
@@ -11,10 +12,20 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 import streamlit as st
-import streamlit.components.v1 as components
 
 from src.constants import CATEGORY_LABELS
 from src.priorities import get_priority_for_hazard
+
+
+def show_html_frame(html_content: str, height: int) -> None:
+    """Display self-contained HTML with Streamlit's supported iframe API."""
+    encoded_html = base64.b64encode(html_content.encode("utf-8")).decode("ascii")
+    st.iframe(
+        f"data:text/html;base64,{encoded_html}",
+        width="stretch",
+        height=height,
+        tab_index=-1,
+    )
 
 
 def setup_page() -> None:
@@ -541,7 +552,7 @@ def show_read_aloud_button(text_to_read: str, key: str) -> None:
     # JSON encoding keeps quotes and line breaks safe inside the small
     # browser script that passes the text to the device's speech engine.
     speech_text = json.dumps(str(text_to_read))
-    components.html(
+    show_html_frame(
         f"""
         <button id="{button_id}" style="min-height:44px;padding:8px 14px;border-radius:10px;border:2px solid #075985;background:#e0edf8;color:#0f172a;font-size:16px;font-weight:700;cursor:pointer;">Read Aloud</button>
         <script>
@@ -644,7 +655,7 @@ def render_score_trend_chart(rows: list[Dict[str, Any]]) -> None:
         }
         """
 
-    components.html(
+    show_html_frame(
         f"""
         <style>
           .chart-shell {{ background:{background}; border:2px solid {grid}; border-radius:16px; padding:12px; }}
@@ -660,7 +671,6 @@ def render_score_trend_chart(rows: list[Dict[str, Any]]) -> None:
         </div>
         """,
         height=350,
-        scrolling=False,
     )
 
 
@@ -700,7 +710,7 @@ def show_current_home_and_room_status() -> None:
     st.markdown(
         f"""
         <div class="plain-card">
-            <strong>Room ID:</strong> {safe_text(room_id or "Not selected")}
+            <strong>Room Name:</strong> {safe_text(room_id or "Not selected")}
         </div>
         """,
         unsafe_allow_html=True,
@@ -753,7 +763,7 @@ def show_score_explanation_card(score_breakdown: Dict[str, Any]) -> None:
             <div class="plain-card">
                 <strong>Why this score?</strong><br><br>
                 AI hazard points: {safe_text(score_breakdown.get("ai_points", 0))} ({safe_text(score_breakdown.get("ai_assessed_hazards", 0))} AI-assessed, {safe_text(score_breakdown.get("backup_scored_hazards", 0))} category backup)<br>
-                Checklist concern points: {safe_text(score_breakdown.get("checklist_points", 0))}<br>
+                Follow-up concern points: {safe_text(score_breakdown.get("checklist_points", 0))}<br>
                 Skipped follow-up buffer: {safe_text(score_breakdown.get("skip_buffer_points", 0))}<br>
                 Raw score before cap: {safe_text(raw_score)}<br>
                 Final score: {safe_text(score_breakdown.get("final_score", 0))}/100<br>

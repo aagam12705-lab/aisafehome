@@ -37,7 +37,7 @@ def build_hazard_lines(hazards: List[Dict[str, Any]]) -> str:
 
 def build_checklist_lines(checklist_answers: List[Dict[str, Any]]) -> str:
     """
-    Builds the checklist section of the report.
+    Builds the follow-up question section of the report.
     """
 
     lines = []
@@ -49,7 +49,7 @@ def build_checklist_lines(checklist_answers: List[Dict[str, Any]]) -> str:
             )
 
     if not lines:
-        return "No checklist concerns were marked Yes or Not sure."
+        return "No follow-up concerns were marked No or Not sure."
 
     return "\n".join(lines)
 
@@ -60,7 +60,7 @@ def build_report_text() -> str:
     """
 
     room_type = st.session_state.get("room_type", "Room")
-    room_id = st.session_state.get("current_room_id") or "No Room ID"
+    room_id = st.session_state.get("current_room_id") or "No Room Name"
 
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
@@ -91,7 +91,7 @@ Date: {date.today().strftime('%B %d, %Y')}
 Room Checked:
 {room_type}
 
-Room ID:
+Room Name:
 {room_id}
 
 Analysis Status:
@@ -109,7 +109,7 @@ Score Explanation:
 Possible Hazards Found by AI:
 {build_hazard_lines(hazards)}
 
-Checklist Concerns:
+Follow-Up Concerns:
 {build_checklist_lines(checklist_answers)}
 
 Top 5 Fixes:

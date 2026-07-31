@@ -212,7 +212,7 @@ def reset_home_password(home_id: str, code: str, new_password: str) -> None:
 
 
 # -----------------------------------------------------------------------------
-# Room IDs
+# Room Names (the database column keeps its original name for compatibility)
 # -----------------------------------------------------------------------------
 
 
@@ -232,7 +232,7 @@ def validate_room_id_or_raise(room_id: Optional[str]) -> str:
     normalized = normalize_room_id(room_id)
 
     if not is_valid_room_id(normalized):
-        raise RuntimeError("Enter a Room ID between 1 and 80 characters.")
+        raise RuntimeError("Enter a Room Name between 1 and 80 characters.")
 
     return normalized
 
@@ -317,7 +317,7 @@ def create_home_room(
         raise RuntimeError("This account does not exist yet.")
 
     if room_id_exists(normalized_home_id, normalized_room_id):
-        raise RuntimeError("That Room ID already exists in this account.")
+        raise RuntimeError("That Room Name already exists in this account.")
 
     client = get_supabase_client()
 
@@ -538,7 +538,7 @@ def save_room_check(
 
         if not home_room:
             raise RuntimeError(
-                "Room ID does not exist in this account. Create or choose the room before saving."
+                "Room Name does not exist in this account. Create or choose the room before saving."
             )
 
         home_room_id = home_room.get("id")

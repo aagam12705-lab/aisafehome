@@ -25,7 +25,7 @@ def get_recommended_first_fixes(
 
     Ranking preference:
     1. Fix Now before Fix Soon before Watch/Review
-    2. Hazards found by both AI and checklist
+    2. Hazards found by both AI and follow-up questions
     3. Higher-point categories
     4. Duplicate recommendations removed
     """
@@ -88,7 +88,7 @@ def get_recommended_first_fixes(
             {
                 "priority": priority,
                 "text": recommendation,
-                "source": answer.get("question", "Checklist concern"),
+                "source": answer.get("question", "Follow-up concern"),
                 "category": category,
                 "overlap": category in overlapping_categories,
                 "points": HAZARD_POINTS.get(category, 0),

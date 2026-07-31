@@ -111,7 +111,7 @@ Why this score?
 AI hazard points: {score_breakdown.get("ai_points", 0)}
 AI-assessed hazards: {score_breakdown.get("ai_assessed_hazards", 0)}
 Category-backup hazards: {score_breakdown.get("backup_scored_hazards", 0)}
-Checklist concern points: {score_breakdown.get("checklist_points", 0)}
+Follow-up concern points: {score_breakdown.get("checklist_points", 0)}
 Skipped follow-up buffer: {score_breakdown.get("skip_buffer_points", 0)}
 Raw score before cap: {score_breakdown.get("raw_score", score_breakdown.get("total_before_cap", 0))}
 Final score: {score_breakdown.get("final_score", 0)}/100

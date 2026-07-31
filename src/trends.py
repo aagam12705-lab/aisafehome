@@ -4,7 +4,18 @@ trends.py
 Score trend helpers for AI SafeHome.
 """
 
+from datetime import datetime
 from typing import Any, Dict, List
+
+
+def format_trend_datetime(value: Any) -> str:
+    if not value:
+        return "Unknown date"
+    try:
+        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+        return parsed.strftime("%b %-d, %Y at %-I:%M %p UTC")
+    except (TypeError, ValueError):
+        return str(value).replace("T", " ").replace("+00:00", " UTC")
 
 
 def sort_checks_oldest_to_newest(checks: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -20,7 +31,7 @@ def build_score_trend_rows(checks: List[Dict[str, Any]]) -> List[Dict[str, Any]]
         rows.append(
             {
                 "Check Number": index,
-                "Checked": str(check.get("created_at", "Unknown")).replace("T", " "),
+                "Checked": format_trend_datetime(check.get("created_at")),
                 "Score": int(check.get("score") or 0),
                 "Risk Label": check.get("risk_level", "Unknown"),
             }
@@ -84,7 +95,7 @@ def build_trend_summary_text(room_id: str, checks: List[Dict[str, Any]]) -> str:
     return f"""
 AI SafeHome Room Score Trend
 
-Room ID:
+Room Name:
 {room_id}
 
 Trend:

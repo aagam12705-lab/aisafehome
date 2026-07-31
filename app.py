@@ -13,6 +13,8 @@ import src.ui as _ui_module
 import src.comparison as _comparison_module
 import src.trends as _trends_module
 import src.email_ui as _email_ui_module
+import src.report_builder as _report_builder_module
+import src.fixes as _fixes_module
 
 importlib.reload(_database_module)
 importlib.reload(_constants_module)
@@ -22,6 +24,8 @@ importlib.reload(_ui_module)
 importlib.reload(_comparison_module)
 importlib.reload(_trends_module)
 importlib.reload(_email_ui_module)
+importlib.reload(_report_builder_module)
+importlib.reload(_fixes_module)
 
 from src.comparison import (
     build_before_after_summary_text,
@@ -417,8 +421,8 @@ def show_database_save_panel() -> None:
     room_id = st.session_state.get("current_room_id")
 
     if not room_id:
-        st.warning("Choose or create a Room ID before saving.")
-        if st.button("Choose Room ID"):
+        st.warning("Choose or create a Room Name before saving.")
+        if st.button("Choose Room Name"):
             go_to_page("room_id_selection")
         return
 
@@ -428,7 +432,7 @@ def show_database_save_panel() -> None:
             go_to_page("room_stats")
         return
 
-    st.success(f"Saving to your account for Room ID {room_id}")
+    st.success(f"Saving to your account for Room Name {room_id}")
 
     if st.button("Save Result", type="primary"):
 
@@ -541,7 +545,7 @@ def show_room_selection_page() -> None:
     st.title("AI SafeHome")
     st.subheader("Step 1: Choose a Room")
     if st.session_state.get("quick_mode"):
-        show_step_card("Continue without signing in — Choose the room. No account or Room ID is needed unless you decide to save later.")
+        show_step_card("Continue without signing in — Choose the room. No account or Room Name is needed unless you decide to save later.")
     else:
         show_step_card("Step 1 of 6 — Choose the room you want to check.")
 
@@ -559,7 +563,7 @@ def show_room_selection_page() -> None:
 
 def show_room_id_selection_page() -> None:
     st.title("AI SafeHome")
-    st.subheader("Choose Room ID")
+    st.subheader("Choose Room Name")
 
     room_type = st.session_state.get("room_type")
 
@@ -574,7 +578,7 @@ def show_room_id_selection_page() -> None:
         unsafe_allow_html=True,
     )
 
-    st.info("Room IDs keep repeated rooms separate, like BEDROOM-1 and BEDROOM-2.")
+    st.info("Room Names keep repeated rooms separate, like Bedroom 1 and Bedroom 2.")
 
     if not is_database_enabled():
         st.warning("Saved room checks are not available right now.")
@@ -610,50 +614,50 @@ def show_room_id_selection_page() -> None:
             st.code(str(error))
         return
 
-    tab1, tab2 = st.tabs(["Use Existing Room ID", "Create New Room ID"])
-
-    with tab1:
-        if not existing_rooms:
-            st.info(f"No existing {room_type} rooms are available yet.")
-        else:
-            room_options = {room.get("room_id"): room for room in existing_rooms}
-            selected = st.selectbox(
-                "Choose existing Room ID",
-                list(room_options.keys()),
-                key="existing_room_id_select",
-            )
-
-            if st.button("Use This Room ID →", type="primary"):
-                selected_room = room_options[selected]
-                st.session_state["current_room_id"] = selected_room["room_id"]
-                st.session_state["current_home_room_id"] = selected_room["id"]
-                go_to_page("risk_score" if st.session_state.get("ai_result") else "photo_upload")
-
-    with tab2:
-        st.caption("Use IDs like BEDROOM-1, BEDROOM-2, BATHROOM-1. Do not use names or addresses.")
-
+    def show_create_room_name_form() -> None:
+        st.caption("Use a simple name like Bedroom 1, Bedroom 2, or Main Bathroom.")
         new_room_id = st.text_input(
-            "New Room ID",
+            "New Room Name",
             value=suggested_room_id,
             key="new_room_id_input",
         )
 
-        if st.button("Create and Use This Room ID →", type="primary"):
+        if st.button("Create and Use This Room Name →", type="primary"):
             try:
                 created_room = create_home_room(
                     home_id=home_id,
                     room_id=new_room_id,
                     room_type=room_type,
                 )
-
                 st.session_state["current_room_id"] = created_room["room_id"]
                 st.session_state["current_home_room_id"] = created_room["id"]
                 go_to_page("risk_score" if st.session_state.get("ai_result") else "photo_upload")
-
             except Exception as error:
-                st.error("Could not create that Room ID.")
+                st.error("Could not create that Room Name.")
                 with st.expander("Technical details"):
                     st.code(str(error))
+
+    # A first-time room type has nothing to select, so open directly on the
+    # creation flow rather than showing an empty tab first.
+    if not existing_rooms:
+        st.subheader("Create New Room Name")
+        show_create_room_name_form()
+    else:
+        tab1, tab2 = st.tabs(["Use Existing Room Name", "Create New Room Name"])
+        with tab1:
+            room_options = {room.get("room_id"): room for room in existing_rooms}
+            selected = st.selectbox(
+                "Choose existing Room Name",
+                list(room_options.keys()),
+                key="existing_room_id_select",
+            )
+            if st.button("Use This Room Name →", type="primary"):
+                selected_room = room_options[selected]
+                st.session_state["current_room_id"] = selected_room["room_id"]
+                st.session_state["current_home_room_id"] = selected_room["id"]
+                go_to_page("risk_score" if st.session_state.get("ai_result") else "photo_upload")
+        with tab2:
+            show_create_room_name_form()
 
     show_current_home_and_room_status()
 
@@ -835,7 +839,7 @@ def show_ai_results_page() -> None:
         )
     )
 
-    if st.button("Continue to Checklist →", type="primary"):
+    if st.button("Continue to Follow-Up Questions →", type="primary"):
         reset_checklist_progress()
         go_to_page("checklist")
 
@@ -961,7 +965,7 @@ def show_checklist_page() -> None:
 
 def show_checklist_summary_page() -> None:
     st.title("AI SafeHome")
-    st.subheader("Checklist Summary")
+    st.subheader("Follow-Up Summary")
 
     ai_result = st.session_state.get("ai_result") or {}
     hazards = ai_result.get("hazards", [])
@@ -975,7 +979,7 @@ def show_checklist_summary_page() -> None:
     if st.session_state.get("checklist_was_skipped"):
         st.info(f"Follow-up questions were skipped. An AI uncertainty buffer of {skip_buffer_points} points was added.")
     else:
-        st.write(f"Checklist answers saved: {len(checklist_answers)}")
+        st.write(f"Follow-up answers saved: {len(checklist_answers)}")
 
     score = calculate_score(hazards, checklist_answers, skip_buffer_points)
     risk_level = get_risk_level(score)
@@ -1034,7 +1038,7 @@ def show_top_5_fixes(limit: int = 5) -> List[Dict[str, Any]]:
 
 
 def show_current_check_comparison() -> None:
-    """Compares a recheck to the latest saved result for the same Room ID."""
+    """Compares a recheck to the latest saved result for the same Room Name."""
     home_id = get_logged_in_home_id()
     room_id = st.session_state.get("current_room_id")
     current_hazards = (st.session_state.get("ai_result") or {}).get("hazards", [])
@@ -1066,7 +1070,7 @@ def show_current_check_comparison() -> None:
     col1, col2 = st.columns(2)
     col1.metric("Previous Score", f"{previous_check.get('score', 0)}/100")
     col2.metric("Current Score", f"{st.session_state.get('score', 0)}/100")
-    st.caption("This compares the current photo with the latest saved check for this same Room ID.")
+    st.caption("This compares the current photo with the latest saved check for this same Room Name.")
 
     for heading, items, display in [
         ("Hazards resolved", resolved, st.success),
@@ -1087,7 +1091,7 @@ def show_risk_score_page() -> None:
 
     if score is None:
         st.error("No score is available yet.")
-        if st.button("Back to Checklist"):
+        if st.button("Back to Follow-Up Questions"):
             go_to_page("checklist")
         return
 
@@ -1311,7 +1315,7 @@ def show_saved_results_page() -> None:
                 <div class="plain-card">
                     <strong>Check {index}</strong><br>
                     Room: {safe_text(row.get("room_type"))}<br>
-                    Room ID: {safe_text(row.get("room_id") or "No Room ID")}<br>
+                    Room Name: {safe_text(row.get("room_id") or "No Room Name")}<br>
                     Score: {safe_text(row.get("score"))}/100<br>
                     Risk Label: {safe_text(row.get("risk_level"))}<br>
                     Checked: {safe_text(format_database_datetime(row.get("created_at")))}
@@ -1338,10 +1342,10 @@ def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
     checklist_lines = [
         f"- {answer}: {count}"
         for answer, count in sorted(checklist_counts.items())
-    ] or ["- No saved checklist answers yet."]
+    ] or ["- No saved follow-up answers yet."]
 
     return f"""
-Room ID: {room_stats.get("room_id")}
+Room Name: {room_stats.get("room_id")}
 Room Type: {room_stats.get("room_type")}
 
 Checks Saved: {room_stats.get("check_count", 0)}
@@ -1356,7 +1360,7 @@ Latest Check: {format_database_datetime(room_stats.get("latest_created_at"))}
 Most Common Hazards:
 {chr(10).join(hazard_lines)}
 
-Checklist Answer Summary:
+Follow-Up Answer Summary:
 {chr(10).join(checklist_lines)}
 
 """.strip()
@@ -1374,7 +1378,7 @@ def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
 
     if len(checks) < 2:
         st.info(
-            "Save at least two checks for this same Room ID to compare before and after results."
+            "Save at least two checks for this same Room Name to compare before and after results."
         )
         return
 
@@ -1533,7 +1537,7 @@ def show_room_health_trend_chart(home_id: str, room_id: str) -> None:
         return
 
     if len(checks) < 2:
-        st.info("Save at least two checks for this same Room ID to see a score trend.")
+        st.info("Save at least two checks for this same Room Name to see a score trend.")
         return
 
     trend_rows = build_score_trend_rows(checks)
@@ -1649,7 +1653,7 @@ def show_room_stats_page() -> None:
     for room in room_stats_list:
         table_rows.append(
             {
-                "Room ID": room.get("room_id"),
+                "Room Name": room.get("room_id"),
                 "Room Type": room.get("room_type"),
                 "Checks": room.get("check_count"),
                 "Average Score": room.get("average_score"),
@@ -1665,7 +1669,7 @@ def show_room_stats_page() -> None:
         for room in room_stats_list
     }
 
-    selected_label = st.selectbox("Choose Room ID", list(room_options.keys()))
+    selected_label = st.selectbox("Choose Room Name", list(room_options.keys()))
     selected_room_id = room_options[selected_label]
 
     selected_stats = fetch_room_stats(home_id, selected_room_id)
@@ -1673,7 +1677,7 @@ def show_room_stats_page() -> None:
     st.markdown(
         f"""
         <div class="plain-card">
-            <strong>Room ID:</strong> {safe_text(selected_stats.get("room_id"))}<br>
+            <strong>Room Name:</strong> {safe_text(selected_stats.get("room_id"))}<br>
             <strong>Room Type:</strong> {safe_text(selected_stats.get("room_type"))}<br>
             <strong>Checks Saved:</strong> {safe_text(selected_stats.get("check_count"))}<br>
             <strong>Average Score:</strong> {safe_text(selected_stats.get("average_score"))}/100<br>
