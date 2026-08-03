@@ -1,38 +1,33 @@
-# AI SafeHome Database Deployment Test
+# AI SafeHome Saved-Check Deployment Test
 
-This checklist verifies that AI SafeHome can save anonymous room-check results to Supabase after deployment.
+Use this checklist after deploying the app with optional Supabase saving enabled.
 
-## Safety Rules
+## Required configuration
 
-The deployed database must not store:
+- [ ] `DATABASE_ENABLED=true`
+- [ ] Supabase URL and service-role secret are configured as deployment secrets, never committed to GitHub.
+- [ ] Real AI configuration is present only if real AI analysis is enabled.
+- [ ] Optional email configuration is present only if server-side email is enabled.
 
-- Uploaded photos
-- Names
-- Addresses
-- Ages
-- Medical history
-- Medication lists
-- Insurance information
-- Real patient photos
-- Faces
-- Mail
-- Bills
-- Medication bottles
-- Medical documents
+## Account and saved-room checks
 
-The database may store only anonymous room-check results.
+- [ ] A new account accepts a valid email address and password.
+- [ ] The stored password is a hash, not a readable password.
+- [ ] Password-reset email goes to the account email address.
+- [ ] A signed-in person can create a Room Name and save a completed check.
+- [ ] A person can still complete a check without signing in.
+- [ ] Rechecking the same Room Name updates stats, trends, and before/after comparison.
 
----
+## Data checks
 
-## Streamlit Cloud Secrets Required
+- [ ] Saved rows contain only the account and room-check information described in [DATA_POLICY.md](DATA_POLICY.md).
+- [ ] No uploaded photo or base64 image data appears in Supabase.
+- [ ] No uploaded photo is included in email summaries.
+- [ ] The app gives a helpful message if Supabase is unavailable.
 
-The deployed app needs these secrets:
+## Deployment smoke test
 
-```toml
-APP_VERSION = "1.0"
-AI_ANALYSIS_MODE = "fake"
-DATABASE_ENABLED = "true"
-SUPABASE_URL = "your_supabase_project_url_here"
-SUPABASE_SERVICE_ROLE_KEY = "your_supabase_secret_or_service_role_key_here"
-OPENAI_MODEL = "gpt-5.5"
-OPENAI_API_KEY = "your_openai_key_here"
+- [ ] App loads on desktop and phone.
+- [ ] Saving works when enabled and stays out of the way when disabled.
+- [ ] Dark and high-contrast mode stay readable after deployment.
+- [ ] No secret, API key, raw database error, or stack trace is shown to a normal user.

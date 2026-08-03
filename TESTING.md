@@ -1,255 +1,48 @@
-# AI SafeHome Testing Checklist
-
-AI SafeHome is tested using staged, non-patient photos only.
-
-Do not test with:
-- Faces
-- Names
-- Addresses
-- Mail
-- Bills
-- Medication bottles
-- Medical documents
-- Real patient photos
-- Medical history
-
-## Test Devices
-
-- Laptop browser:
-- iPhone Safari:
-- Deployed Streamlit app link:
-
-## Full Demo Flow Test
-
-### 1. Landing Page
-
-Expected:
-- App name appears
-- Tagline appears
-- Safety disclaimer appears
-- Privacy reminder appears
-- Start Safety Check button works
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### 2. Room Selection
-
-Expected:
-- Room options appear:
-  - Living Room
-  - Bedroom
-  - Bathroom
-  - Kitchen
-  - Hallway
-  - Stairs
-  - Other
-- User can select each room
-- Continue button works
-- Back button works
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### 3. Photo Upload
-
-Expected:
-- User can upload or take a staged room photo
-- JPG, JPEG, PNG, or WEBP works
-- Photo preview appears
-- Privacy warning appears
-- App does not ask for personal information
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### 4. Fake AI Hazard Results
-
-Expected:
-- Analyze Photo button works
-- Fake AI-style hazards appear
-- Hazard cards include:
-  - Hazard title
-  - Category
-  - Why it matters
-  - Suggested fix
-- Safety reminder appears
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### 5. Checklist
-
-Expected:
-- All 10 checklist questions appear
-- Each question has:
-  - Yes
-  - No
-  - Not sure
-  - Not applicable
-- Save Checklist works
-- Checklist summary appears
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### 6. Risk Score
-
-Expected:
-- Score appears from 0 to 100
-- Risk label appears:
-  - Low Risk
-  - Moderate Risk
-  - High Risk
-- Top concerns appear
-- Recommended first fixes appear
-- Score breakdown opens
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### 7. Safety Report
-
-Expected:
-- Safety report is created
-- Report includes:
-  - Date
-  - Room type
-  - Score
-  - Risk level
-  - AI hazards
-  - Checklist concerns
-  - Recommended fixes
-  - Safety disclaimer
-  - Human review reminder
-  - Privacy reminder
-- Download report button works
-- Print/save instructions appear
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-## iPhone Safari Test
-
-Expected:
-- No sideways scrolling
-- Buttons are easy to tap
-- Text is readable without zooming
-- Upload works
-- Checklist is usable
-- Report is readable
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-## Score Test Cases
-
-### Test Case 1: Living Room
-
-Expected fake AI hazards:
-- Cord hazard
-- Loose rug
-- Floor clutter
-
-Expected AI-only score:
-- 12 + 10 + 10 = 32
-- Moderate Risk
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### Test Case 2: Bathroom
-
-Expected fake AI hazards:
-- Bathroom grab bar concern
-- Slippery floor
-
-Expected AI-only score:
-- 15 + 12 = 27
-- Low Risk
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-### Test Case 3: Stairs
-
-Expected fake AI hazards:
-- Stairs
-- Handrail
-
-Expected AI-only score:
-- 15 + 15 = 30
-- Moderate Risk
-
-Result:
-- [ ] Pass
-- [ ] Fail
-
-Notes:
-
----
-
-## Final Demo Readiness
-
-The app is demo-ready when:
-
-- [ ] Full flow works on laptop
-- [ ] Full flow works on iPhone Safari
-- [ ] Deployed Streamlit link works
-- [ ] At least 3 staged photos are tested
-- [ ] No real patient photos are used
-- [ ] No personal or medical data is collected
-- [ ] Report downloads successfully
-- [ ] Student can explain the scoring algorithm
-- [ ] Student can explain that fake AI is being used before real AI integration
-- [ ] Student can explain privacy and safety limits
+# AI SafeHome Testing Guide
+
+Test only with staged, non-patient room photos. Do not use photos containing faces, addresses, mail, medicine bottles, or medical documents.
+
+## Core check flow
+
+- [ ] Landing page explains the four-step flow in plain language.
+- [ ] Room selection works on desktop and phone.
+- [ ] One JPG, PNG, or WEBP room photo up to 30 MB uploads correctly.
+- [ ] The preview is upright and the photo-quality message is understandable.
+- [ ] AI results show readable hazard cards and approximate numbered photo markers.
+- [ ] Follow-up questions are generated only for uncertainty and use simple language.
+- [ ] Risk score stays between 0 and 100 and shows a risk label and color bar.
+- [ ] The three-step safety plan appears while remaining recommendations are available under “See more suggested steps.”
+- [ ] The full report downloads and Read Aloud works when enabled.
+
+## Saved-room flow
+
+- [ ] A person can continue without signing in.
+- [ ] A valid email and password can create an optional account.
+- [ ] Password-reset code goes only to the account email.
+- [ ] A Room Name can be created or an existing Room Name selected.
+- [ ] Saving a check adds it to room stats.
+- [ ] A recheck appears in score trends and before/after comparison.
+- [ ] Before/after labels show readable times, score, and risk label without exposing check IDs.
+
+## Sharing
+
+- [ ] Email summary accepts one to five recipient email addresses.
+- [ ] Removing a recipient keeps at least one email field available.
+- [ ] Download and email text do not include uploaded photos.
+
+## Accessibility and mobile
+
+- [ ] Test Standard, Large, and Extra Large text.
+- [ ] Test Light, Dark, System, and High Contrast modes.
+- [ ] Verify fields, tooltips, accessibility controls, and dropdowns remain readable in every mode.
+- [ ] Verify the app works without horizontal scrolling on a narrow phone screen.
+- [ ] Verify controls are comfortably tappable and keyboard reachable.
+- [ ] Verify Read Aloud buttons can be enabled and disabled in Accessibility.
+
+## Responsible-AI checks
+
+- [ ] Sample/fallback results are clearly labeled as sample results.
+- [ ] The privacy and AI information panel is visible from the landing page.
+- [ ] Photo upload warns people not to upload personal information.
+- [ ] The app does not claim to diagnose medical conditions or guarantee fall prevention.
+- [ ] A failed AI call shows a safe fallback rather than crashing.

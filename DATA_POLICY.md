@@ -1,72 +1,43 @@
 # AI SafeHome Data Policy
 
-AI SafeHome is an educational home-safety demo app.
+AI SafeHome is an educational home-safety app, not a medical service.
 
-The database feature is designed to store anonymous safety-check results for testing, validation, and project demonstration.
+## What people should upload
 
-It is not designed to store patient records, medical information, or private personal information.
+Use a photo of a room only. Before uploading, remove or avoid faces, names, addresses, mail, bills, medicine bottles, medical documents, and other personal information.
 
-## Database Purpose
+## Photo handling
 
-The database may be used to save anonymous room-check results, such as:
+The app uses an uploaded photo during the current session for preview, photo-quality feedback, and hazard analysis. Photos are not saved to the AI SafeHome database and are not included in emailed summaries.
 
-- Room type
-- AI analysis mode
-- Fall-hazard score
-- Risk label
-- Hazard categories
-- Hazard titles
-- Recommendations
-- Checklist answers
-- Whether the checklist was skipped
-- Whether a demo/staged example was used
-- Timestamp
-- App version
+When real AI analysis is enabled, the photo is sent to the configured AI provider so it can be analyzed. A person should only upload a photo they are comfortable sending for that purpose.
 
-## Data That Must Not Be Stored
+## Optional saved checks and accounts
 
-AI SafeHome must not store:
+Saving is optional. To save checks, a person creates an account with an email address and password. The app stores:
 
-- Uploaded photos
-- Base64 image data
-- Names
-- Addresses
-- Ages
-- Phone numbers
-- Emails
-- Medical history
-- Medication lists
-- Insurance information
-- Doctor or therapist names
-- Patient IDs
-- Real patient photos
-- Faces
-- Mail
-- Bills
-- Medication bottles
-- Medical documents
-- GPS location
+- Account email address
+- A secure password hash, never the readable password
+- Room Name and room type
+- Risk score and risk label
+- Hazard categories, titles, recommendations, and follow-up answers
+- Check time and analysis mode
 
-## Photo Rule
+This information lets the app show room history, score trends, and before/after comparisons. The app does not use a public list of saved checks.
 
-Uploaded photos may be temporarily analyzed during the app session, but photos must not be saved to the database.
+## Optional email sharing
 
-Testing should use staged, non-patient photos only.
+People choose the email addresses that receive a summary. The app sends the text summary only; it does not attach uploaded photos.
 
-## Medical Safety Rule
+## What the app is not designed to store
 
-AI SafeHome does not:
+- Uploaded photos or base64 image data in the app database
+- Medical history, medications, insurance information, or patient IDs
+- Home street addresses or GPS location
+- Names other than an account email address used for optional sign-in
 
-- Diagnose medical risk
-- Predict individual fall risk
-- Guarantee fall prevention
-- Replace a doctor, therapist, or home-safety professional
+## AI and safety limits
 
-AI may miss hazards. Human review is recommended.
+AI SafeHome looks for possible visible environmental fall hazards. It may miss hazards, place a visual marker approximately, or misunderstand a photo. The risk score is not a medical diagnosis or an individual fall-risk prediction.
 
-## Database Feature Flag
-
-Database saving must be controlled by:
-
-```bash
-DATABASE_ENABLED=false
+For urgent or serious concerns, review the room with a qualified home-safety professional.

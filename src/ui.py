@@ -704,19 +704,6 @@ def show_step_card(step_text: str) -> None:
     )
 
 
-def show_current_home_and_room_status() -> None:
-    room_id = st.session_state.get("current_room_id")
-
-    st.markdown(
-        f"""
-        <div class="plain-card">
-            <strong>Room Name:</strong> {safe_text(room_id or "Not selected")}
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-
 def render_hazard_card(hazard: Dict[str, Any], number: int) -> None:
     """
     Displays one hazard using native Streamlit controls.

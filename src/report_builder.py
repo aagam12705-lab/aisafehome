@@ -54,6 +54,19 @@ def build_checklist_lines(checklist_answers: List[Dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def build_safety_plan_lines(fixes: List[Dict[str, Any]]) -> str:
+    """Make the report lead with the three most useful next actions."""
+    if not fixes:
+        return "No specific steps were generated."
+
+    first_steps = build_top_fixes_text(fixes[:3])
+    if len(fixes) <= 3:
+        return first_steps
+
+    other_steps = build_top_fixes_text(fixes[3:])
+    return f"Start here:\n{first_steps}\n\nOther suggested steps:\n{other_steps}"
+
+
 def build_report_text() -> str:
     """
     Builds the main one-room safety report from Streamlit session state.
@@ -112,8 +125,8 @@ Possible Hazards Found by AI:
 Follow-Up Concerns:
 {build_checklist_lines(checklist_answers)}
 
-Top 5 Fixes:
-{build_top_fixes_text(fixes)}
+Your 3-Step Safety Plan:
+{build_safety_plan_lines(fixes)}
 
 Safety Disclaimer:
 {SAFETY_DISCLAIMER}

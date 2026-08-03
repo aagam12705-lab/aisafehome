@@ -1,173 +1,105 @@
 # AI SafeHome
 
-AI SafeHome is a beginner-friendly Python Streamlit web app for the Congressional App Challenge.
+AI SafeHome helps older adults, families, and caregivers spot possible fall hazards in a room. A person takes or uploads one room photo, answers only the follow-up questions the photo cannot answer, and receives a risk score plus a plain-language safety plan.
 
-The app helps older adults, families, and caregivers identify possible home fall hazards from a room photo and checklist, then creates a plain-English safety report.
+This is an educational home-safety tool. It does not diagnose medical conditions, calculate a person's medical fall risk, or guarantee fall prevention.
 
-## Version 1 Goal
+## What the app does
 
-Version 1 will run as a mobile-friendly Streamlit web app that can open in Safari on iPhone.
+1. Choose a room and take or upload one photo.
+2. AI looks for possible visible fall hazards.
+3. The app asks short follow-up questions only when the photo is unclear.
+4. The app gives a 0–100 risk score, a risk label, and a three-step safety plan.
+5. A person can download, share, email, or save a check to compare it with a later room check.
 
-This is not a native iOS app yet.
+## Built for older adults
 
-## MVP Features
+- Large, mobile-friendly controls
+- Light, dark, system, and high-contrast color modes
+- Adjustable text size
+- Optional Read Aloud buttons
+- Plain-English questions and recommendations
+- Visual markers showing the approximate place in the photo that matches each possible hazard
 
-- Landing page
-- Room selection
-- Upload or take a room photo
-- Photo preview
-- AI-style hazard results
-- Checklist
-- Fall-risk score from 0 to 100
-- Low / Moderate / High risk label
-- Plain-English recommendations
-- Printable safety report
-- Safety disclaimer
+## Key features
 
-## Privacy and Safety Rules
+- AI photo analysis for visible home fall hazards
+- AI-generated follow-up questions in simple language
+- A capped 0–100 risk score with a clear risk label
+- A three-step safety plan with estimated score impact
+- Before/after room comparisons for rechecks
+- Room history, trends, and progress summaries
+- Optional email sharing with up to five recipients
+- Optional password-protected accounts for saving room checks
 
-AI SafeHome does not collect:
+## How the score works
 
-- Names
-- Addresses
-- Age
-- Medical history
-- Medications
-- Real patient photos
+AI considers each possible hazard separately and assigns a severity score. If an AI score is unavailable, the app uses the established category value as a backup. Confirmed follow-up concerns and an AI uncertainty buffer for skipped follow-up questions may be added. The final score is always capped at 100.
 
-The app does not diagnose medical risk, does not guarantee fall prevention, and does not replace a qualified professional.
+A lower score means fewer possible fall hazards were identified. It is a guide for prioritizing room-safety improvements, not a medical prediction.
 
-## Tech Stack
+## Privacy and responsible AI
 
-- Python
-- Streamlit
-- Pillow
-- python-dotenv
-- OpenAI API later
-- GitHub
-- Streamlit Community Cloud or Render
+- Use room photos without faces, mail, addresses, medicine bottles, or medical documents.
+- Photos are used during the current app session and are not saved to the app database.
+- When real AI analysis is enabled, the uploaded image is sent to the configured AI provider for analysis.
+- If a person chooses to save a check, the app stores the account email, Room Name, score, risk label, and check details needed for progress history. Passwords are stored as secure hashes, not as readable text.
+- AI can miss hazards or misunderstand a photo. A person should review the room and seek qualified help for serious concerns.
 
-## Database Access Plan
+See [DATA_POLICY.md](DATA_POLICY.md) for the full data description.
 
-AI SafeHome may include database access for anonymous testing and validation results.
+## Technical design
 
-The database is not used to store photos or personal information.
+```mermaid
+flowchart LR
+    A[Room photo] --> B[Photo quality check]
+    B --> C[AI hazard analysis]
+    C --> D[Simple follow-up questions]
+    D --> E[Risk score and safety plan]
+    E --> F[Download, email, or save]
+    F --> G[Room trends and before/after comparison]
+```
 
-Allowed database data:
+The app is built with Python and Streamlit. Pillow prepares upright photo previews and visual hazard markers. The optional AI analysis uses the OpenAI API. Optional saved-check and account features use Supabase; optional email sharing uses Brevo.
 
-- Room type
-- Score
-- Risk label
-- Hazard categories
-- Hazard titles
-- Checklist answers
-- Recommendations
-- AI mode
-- Timestamp
+## Source layout
 
-Not allowed database data:
+- `app.py` — page flow and the small application router
+- `src/app_state.py` — session state, reset actions, and navigation
+- `src/account_ui.py` — optional account, password-reset, and privacy controls
+- `src/image_tools.py` — image validation and orientation handling
+- `src/saved_checks.py` — optional saving and room-history updates
+- `src/ai_analysis.py` and `src/scoring.py` — AI analysis and score calculation
+- `src/ui.py` — shared accessible styling and display helpers
+- `src/report_builder.py`, `src/trends.py`, and `src/comparison.py` — reports and progress views
 
-- Uploaded photos
-- Names
-- Addresses
-- Ages
-- Medical history
-- Medication lists
-- Real patient photos
-- Faces
-- Mail
-- Bills
-- Medication bottles
-- Medical documents
+The modules are intentionally separated by responsibility so a future editor can change one part of the app without searching through every page.
 
-Database saving is controlled by:
+## Run locally
 
-```bash
-DATABASE_ENABLED=false
-## Database Privacy
+1. Create and activate a Python virtual environment.
+2. Install dependencies:
 
-AI SafeHome includes optional database access for anonymous testing and validation results.
+   ```bash
+   pip install -r requirements.txt
+   ```
 
-The database may store:
+3. Add the required secrets to `.env` or Streamlit secrets. Do not commit those secrets.
+4. Run the app:
 
-- Room type
-- Score
-- Risk label
-- Hazard categories
-- Hazard titles
-- Checklist answers
-- Recommendations
-- AI mode
-- Timestamp
+   ```bash
+   streamlit run app.py
+   ```
 
-The database does not store:
+The app can still show safe sample/fallback results if real AI analysis is unavailable. Saved checks and server-side email are optional and require their respective configuration.
 
-- Uploaded photos
-- Names
-- Addresses
-- Ages
-- Medical history
-- Medication lists
-- Real patient photos
-- Faces
-- Mail
-- Bills
-- Medication bottles
-- Medical documents
+## Project guide
 
-## Home ID Access
+- [TESTING.md](TESTING.md) — functional, accessibility, and mobile checks
+- [FINAL_CHECKLIST.md](FINAL_CHECKLIST.md) — pre-submission checklist
+- [DATA_POLICY.md](DATA_POLICY.md) — privacy and responsible-AI details
+- [DEPLOYMENT_DATABASE_TEST.md](DEPLOYMENT_DATABASE_TEST.md) — saved-check deployment testing
 
-AI SafeHome does not show a public list of all recent saved checks.
+## Congressional App Challenge submission notes
 
-Saved checks are grouped by anonymous Home ID.
-
-A Home ID looks like:
-
-```text
-HOME-8K2M-Q9PA-W4ZT
-Database saving is controlled by:
-
-```bash
-DATABASE_ENABLED=true
-## How to Run Locally
-
-```bash
-source venv/bin/activate
-streamlit run app.py
-
-## Deployment
-
-This app is designed to deploy on Streamlit Community Cloud.
-
-Main file:
-
-```text
-app.py
-
-## Final Demo Materials
-
-This project includes:
-
-- `TESTING.md` — testing checklist
-- `DEMO_SCRIPT.md` — 2–3 minute demo video script
-- `SUBMISSION_NOTES.md` — app explanation and judging alignment
-- `FINAL_CHECKLIST.md` — final readiness checklist
-- `sample_photos/README.md` — staged photo rules
-
-## AI Use Disclosure
-
-AI SafeHome uses AI to help identify possible visible environmental fall hazards from room photos.
-
-AI may make mistakes. Users should review the room themselves and ask a qualified professional for serious safety concerns.
-
-AI coding tools were also used for brainstorming, debugging, and improving the project. The student reviewed, modified, tested, and can explain the code.
-
-## Final Safety Statement
-
-AI SafeHome is an educational home-safety tool.
-
-It does not diagnose medical conditions, predict individual medical fall risk, or guarantee fall prevention.
-
-It does not replace a doctor, therapist, or home-safety professional.
-
-Use staged, non-patient photos only.
+For a demonstration, use staged room photos only. Show one complete path: photo, AI findings, follow-up questions, risk score, three-step plan, and a before/after comparison. Be ready to explain the score cap, the uncertainty buffer, privacy limits, and why human review remains important.
