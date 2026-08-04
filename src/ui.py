@@ -89,6 +89,36 @@ def add_mobile_friendly_style() -> None:
         """
         dropdown_css = "#ffffff|#111827|#075985|#ffffff"
 
+    system_dark_widget_css = ""
+    if color_scheme == "System":
+        system_dark_widget_css = """
+        @media (prefers-color-scheme: dark) {
+            [data-testid="stExpander"] summary {
+                color:#f8fafc !important;
+                background:#0f172a !important;
+                border-color:#94a3b8 !important;
+            }
+            [data-testid="stExpander"] summary *,
+            [data-testid="stExpander"] summary svg {
+                color:#f8fafc !important;
+                fill:#f8fafc !important;
+            }
+            [data-testid="stExpander"] summary:hover,
+            [data-testid="stExpander"][open] > summary,
+            [data-testid="stExpander"] details[open] > summary {
+                color:#082f49 !important;
+                background:#7dd3fc !important;
+            }
+            [data-testid="stExpander"] summary:hover *,
+            [data-testid="stExpander"][open] > summary *,
+            [data-testid="stExpander"] summary:hover svg,
+            [data-testid="stExpander"][open] > summary svg {
+                color:#082f49 !important;
+                fill:#082f49 !important;
+            }
+        }
+        """
+
     dropdown_background, dropdown_text, dropdown_selected, dropdown_selected_text = dropdown_css.split("|")
 
     st.markdown(
@@ -119,7 +149,7 @@ def add_mobile_friendly_style() -> None:
 
         .block-container {{
             max-width:760px;
-            padding:1.75rem 1.1rem 2.5rem 1.1rem;
+            padding:2.15rem 1.1rem 3rem 1.1rem;
         }}
 
         h1, h2, h3, h4, h5, h6, p, li, label {{
@@ -129,9 +159,13 @@ def add_mobile_friendly_style() -> None:
         a {{ color:var(--safe-link) !important; }}
 
         h1 {{
-            font-size:2rem !important;
-            line-height:1.15 !important;
+            font-size:2.15rem !important;
+            line-height:1.1 !important;
+            letter-spacing:-.035em;
+            margin-bottom:.45rem !important;
         }}
+
+        h2 {{ letter-spacing:-.02em; margin-top:1.75rem !important; }}
 
         p, li {{
             line-height:1.6;
@@ -149,6 +183,7 @@ def add_mobile_friendly_style() -> None:
             padding:.7rem 1rem;
             white-space:normal;
             line-height:1.25;
+            box-shadow:0 2px 0 rgba(15, 23, 42, .10);
             background:var(--safe-secondary) !important;
             border:2px solid var(--safe-border) !important;
             color:var(--safe-secondary-text) !important;
@@ -159,6 +194,15 @@ def add_mobile_friendly_style() -> None:
             border-color:var(--safe-primary) !important;
             color:var(--safe-primary-text) !important;
         }}
+
+        .stButton > button:hover,
+        .stDownloadButton > button:hover {{
+            transform:translateY(-1px);
+            box-shadow:0 5px 12px rgba(15, 23, 42, .16);
+        }}
+
+        .stButton > button:active,
+        .stDownloadButton > button:active {{ transform:translateY(0); }}
 
         .stButton > button *,
         .stDownloadButton > button * {{
@@ -192,12 +236,14 @@ def add_mobile_friendly_style() -> None:
             background-color:var(--safe-card);
             color:var(--safe-text);
             line-height:1.45;
+            box-shadow:0 8px 20px rgba(15, 23, 42, .08);
         }}
 
         .step-card {{
             background-color:var(--safe-surface);
             font-size:1rem;
             font-weight:700;
+            border-left:5px solid var(--safe-primary);
         }}
 
         .small-muted {{
@@ -283,7 +329,17 @@ def add_mobile_friendly_style() -> None:
         }}
 
         [data-testid="stMetricValue"] {{
-            font-size:1.45rem;
+            font-size:1.6rem;
+            font-weight:800;
+            color:var(--safe-text) !important;
+        }}
+
+        [data-testid="stMetric"] {{
+            background:var(--safe-card);
+            border:1px solid var(--safe-border);
+            border-radius:14px;
+            padding:.85rem;
+            box-shadow:0 4px 12px rgba(15, 23, 42, .06);
         }}
 
         div[data-testid="stFileUploader"] {{
@@ -429,14 +485,15 @@ def add_mobile_friendly_style() -> None:
             color:var(--safe-text) !important;
             background-color:var(--safe-surface) !important;
             border-color:var(--safe-border) !important;
+            border-radius:14px !important;
         }}
 
         /* The accessibility control is a Streamlit expander (the gear row),
            not a select-menu option. Give its closed and open headers explicit
            colors so they remain readable in every color mode. */
         [data-testid="stExpander"] summary {{
-            color:{dropdown_text} !important;
-            background:{dropdown_background} !important;
+            color:var(--safe-text) !important;
+            background:var(--safe-input) !important;
             border:2px solid var(--safe-border) !important;
             border-radius:10px;
             min-height:52px;
@@ -445,15 +502,15 @@ def add_mobile_friendly_style() -> None:
 
         [data-testid="stExpander"] summary *,
         [data-testid="stExpander"] summary svg {{
-            color:{dropdown_text} !important;
-            fill:{dropdown_text} !important;
+            color:var(--safe-text) !important;
+            fill:var(--safe-text) !important;
         }}
 
         [data-testid="stExpander"] summary:hover,
         [data-testid="stExpander"][open] > summary,
         [data-testid="stExpander"] details[open] > summary {{
-            color:{dropdown_selected_text} !important;
-            background:{dropdown_selected} !important;
+            color:var(--safe-primary-text) !important;
+            background:var(--safe-primary) !important;
         }}
 
         [data-testid="stExpander"] summary:hover *,
@@ -462,8 +519,8 @@ def add_mobile_friendly_style() -> None:
         [data-testid="stExpander"] summary:hover svg,
         [data-testid="stExpander"][open] > summary svg,
         [data-testid="stExpander"] details[open] > summary svg {{
-            color:{dropdown_selected_text} !important;
-            fill:{dropdown_selected_text} !important;
+            color:var(--safe-primary-text) !important;
+            fill:var(--safe-primary-text) !important;
         }}
 
         img {{
@@ -515,6 +572,7 @@ def add_mobile_friendly_style() -> None:
                 font-size:12pt;
             }}
         }}
+        {system_dark_widget_css}
         </style>
         """,
         unsafe_allow_html=True,
@@ -522,7 +580,7 @@ def add_mobile_friendly_style() -> None:
 
 
 def show_accessibility_panel() -> None:
-    with st.expander("⚙️ Accessibility", expanded=False):
+    with st.expander("Accessibility", expanded=False):
         st.caption("Choose a text size and color setting. Your choice applies right away.")
         st.selectbox(
             "Text size",

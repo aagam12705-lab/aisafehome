@@ -64,7 +64,9 @@ The app is built with Python and Streamlit. Pillow prepares upright photo previe
 
 ## Source layout
 
-- `app.py` — page flow and the small application router
+- `app.py` — the minimal Streamlit entry point
+- `src/router.py` — app setup and the route table
+- `src/page_handlers.py` — page-specific UI and workflow behavior
 - `src/app_state.py` — session state, reset actions, and navigation
 - `src/account_ui.py` — optional account, password-reset, and privacy controls
 - `src/image_tools.py` — image validation and orientation handling
