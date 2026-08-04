@@ -548,6 +548,18 @@ def add_mobile_friendly_style() -> None:
             h1 {{
                 font-size:1.8rem !important;
             }}
+
+            /* Recipient controls stay easy to use on a narrow phone: the
+               remove button comes first, then the full-width email field. */
+            [class*="st-key-recipient-row-"] [data-testid="stHorizontalBlock"] {{
+                flex-direction:column-reverse !important;
+                gap:.2rem !important;
+            }}
+
+            [class*="st-key-recipient-row-"] [data-testid="column"] {{
+                width:100% !important;
+                flex:1 1 100% !important;
+            }}
         }}
 
         @media print {{
@@ -802,23 +814,22 @@ def show_score_explanation_card(score_breakdown: Dict[str, Any]) -> None:
         score_breakdown.get("total_before_cap", 0),
     )
 
-    with st.expander("Score breakdown", expanded=False):
-        st.markdown(
-            f"""
-            <div class="plain-card">
-                <strong>Why this score?</strong><br><br>
-                AI hazard points: {safe_text(score_breakdown.get("ai_points", 0))} ({safe_text(score_breakdown.get("ai_assessed_hazards", 0))} AI-assessed, {safe_text(score_breakdown.get("backup_scored_hazards", 0))} category backup)<br>
-                Follow-up concern points: {safe_text(score_breakdown.get("checklist_points", 0))}<br>
-                Skipped follow-up buffer: {safe_text(score_breakdown.get("skip_buffer_points", 0))}<br>
-                Raw score before cap: {safe_text(raw_score)}<br>
-                Final score: {safe_text(score_breakdown.get("final_score", 0))}/100<br>
-                Risk label: {safe_text(score_breakdown.get("risk_level", "Unknown"))}<br><br>
-                Higher score = more possible fall hazards.<br>
-                Lower score = fewer possible fall hazards.
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    st.markdown(
+        f"""
+        <div class="plain-card">
+            <strong>Why this score?</strong><br><br>
+            AI hazard points: {safe_text(score_breakdown.get("ai_points", 0))} ({safe_text(score_breakdown.get("ai_assessed_hazards", 0))} AI-assessed, {safe_text(score_breakdown.get("backup_scored_hazards", 0))} category backup)<br>
+            Follow-up concern points: {safe_text(score_breakdown.get("checklist_points", 0))}<br>
+            Skipped follow-up buffer: {safe_text(score_breakdown.get("skip_buffer_points", 0))}<br>
+            Raw score before cap: {safe_text(raw_score)}<br>
+            Final score: {safe_text(score_breakdown.get("final_score", 0))}/100<br>
+            Risk label: {safe_text(score_breakdown.get("risk_level", "Unknown"))}<br><br>
+            Higher score = more possible fall hazards.<br>
+            Lower score = fewer possible fall hazards.
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 
 def show_risk_score_bar(score: Any) -> None:

@@ -116,21 +116,22 @@ def show_email_summary_panel(
         st.write("Recipients")
 
         for index, entry in enumerate(list(recipient_entries)):
-            field_label = "Recipient email" if index == 0 else f"Additional recipient {index + 1}"
-            st.caption(field_label)
-            email_col, remove_col = st.columns([8, 1])
-            field_key = _recipient_field_key(key_prefix, entry["id"])
-            if field_key not in st.session_state:
-                st.session_state[field_key] = entry.get("email", "")
-            email_col.text_input(
-                field_label,
-                placeholder="name@example.com",
-                key=field_key,
-                label_visibility="collapsed",
-            )
-            if remove_col.button("×", key=f"{key_prefix}_remove_recipient_{entry['id']}", help="Remove this email address"):
-                st.session_state[recipients_key] = [item for item in recipient_entries if item["id"] != entry["id"]]
-                st.rerun()
+            with st.container(key=f"recipient-row-{key_prefix}-{entry['id']}"):
+                field_label = "Recipient email" if index == 0 else f"Additional recipient {index + 1}"
+                st.caption(field_label)
+                email_col, remove_col = st.columns([8, 1])
+                field_key = _recipient_field_key(key_prefix, entry["id"])
+                if field_key not in st.session_state:
+                    st.session_state[field_key] = entry.get("email", "")
+                email_col.text_input(
+                    field_label,
+                    placeholder="name@example.com",
+                    key=field_key,
+                    label_visibility="collapsed",
+                )
+                if remove_col.button("×", key=f"{key_prefix}_remove_recipient_{entry['id']}", help="Remove this email address"):
+                    st.session_state[recipients_key] = [item for item in recipient_entries if item["id"] != entry["id"]]
+                    st.rerun()
 
         if len(recipient_entries) < MAX_RECIPIENTS and st.button("Add new email address", key=f"{key_prefix}_add_recipient"):
             current_emails = _current_recipient_emails(key_prefix, recipient_entries)
@@ -150,12 +151,13 @@ def show_email_summary_panel(
 
         body = f"{summary_title}\n\n{summary_text}\n\n{build_email_footer()}".strip()
 
-        st.text_area(
-            "Email body preview",
-            value=body,
-            height=300,
-            key=f"{key_prefix}_body",
-        )
+        with st.expander("Review email message"):
+            st.text_area(
+                "Email body preview",
+                value=body,
+                height=220,
+                key=f"{key_prefix}_body",
+            )
 
         if is_email_enabled():
             if st.button(
