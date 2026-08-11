@@ -100,9 +100,7 @@ The app can still show safe sample/fallback results if real AI analysis is unava
 The same codebase supports both platforms:
 
 - **Streamlit Community Cloud:** deploy `app.py` as the main file.
-- **Render:** use the included [render.yaml](render.yaml) Blueprint. It starts the same Streamlit app through Render's web service and checks `/_stcore/health`.
-
-Keep `DATABASE_ENABLED=false` for a simple demo, or add the Supabase, email, and OpenAI secrets through the selected platform's secret manager. Render's free tier sleeps after inactivity; its paid Starter plan is the always-on option. [Render deployment limits](https://render.com/docs/free)
+Keep `DATABASE_ENABLED=false` for a simple demo, or add the Supabase, email, and OpenAI secrets through your hosting provider's secret manager.
 
 ## Project guide
 
