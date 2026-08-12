@@ -22,12 +22,30 @@ def main() -> None:
                 timeout=PAGE_LOAD_TIMEOUT_MS,
             )
 
-            # Wait for the browser load event and for Streamlit to render its
-            # app container. Streamlit keeps a WebSocket open, so waiting for
-            # network-idle would never reliably finish.
+            # Wait for the browser load event and for the page to render useful
+            # content. Streamlit's internal data-testid values can change
+            # between releases, so do not depend on one private CSS selector.
+            # Streamlit keeps a WebSocket open, so waiting for network-idle
+            # would never reliably finish.
             page.wait_for_load_state("load", timeout=PAGE_LOAD_TIMEOUT_MS)
-            page.locator('[data-testid="stAppViewContainer"]').wait_for(
+            page.locator("body").wait_for(
                 state="visible",
+                timeout=PAGE_LOAD_TIMEOUT_MS,
+            )
+            page.wait_for_function(
+                """
+                () => {
+                    const body = document.body;
+                    if (!body) return false;
+                    const text = (body.innerText || '').trim();
+                    const hasStreamlitContent = Boolean(
+                        document.querySelector('[data-testid^="st-"]') ||
+                        document.querySelector('iframe') ||
+                        document.querySelector('main')
+                    );
+                    return text.length > 0 || hasStreamlitContent;
+                }
+                """,
                 timeout=PAGE_LOAD_TIMEOUT_MS,
             )
 
