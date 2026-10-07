@@ -39,6 +39,8 @@ def setup_page() -> None:
 def add_mobile_friendly_style() -> None:
     text_size = st.session_state.get("text_size", "Standard")
     color_scheme = st.session_state.get("color_scheme", "System")
+    reduce_motion = st.session_state.get("reduce_motion", False)
+    compact_spacing = st.session_state.get("compact_spacing", False)
 
     # A comfortable default helps users who may not know to open the settings
     # panel before beginning their first check.
@@ -48,6 +50,18 @@ def add_mobile_friendly_style() -> None:
         base_font_size = 21
     elif text_size == "Extra Large":
         base_font_size = 24
+
+    spacing_css = """
+    .stMarkdown, [data-testid="stVerticalBlock"] > div { margin-bottom:.35rem !important; }
+    """ if compact_spacing else ""
+    motion_css = """
+    *, *::before, *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+    """ if reduce_motion else ""
 
     light_theme = """
     --safe-bg:#ffffff; --safe-surface:#f8fafc; --safe-card:#ffffff;
@@ -125,6 +139,8 @@ def add_mobile_friendly_style() -> None:
         f"""
         <style>
         {theme_css}
+        {spacing_css}
+        {motion_css}
 
         html, body, [class*="css"] {{
             font-size:{base_font_size}px;
@@ -593,7 +609,7 @@ def add_mobile_friendly_style() -> None:
 
 def show_accessibility_panel() -> None:
     with st.expander("Accessibility", expanded=False):
-        st.caption("Choose a text size and color setting. Your choice applies right away.")
+        st.caption("Choose settings that make AI SafeHome easier to use. Changes apply right away.")
         st.selectbox(
             "Text size",
             ["Standard", "Large", "Extra Large"],
@@ -610,6 +626,42 @@ def show_accessibility_panel() -> None:
             "Show Read Aloud buttons",
             key="show_read_aloud",
             help="Lets the device read important results and instructions aloud.",
+        )
+
+        st.checkbox(
+            "Reduce motion and animations",
+            key="reduce_motion",
+            help="Removes most movement and animated transitions.",
+        )
+
+        st.checkbox(
+            "Use compact spacing",
+            key="compact_spacing",
+            help="Reduces extra space so more information fits on the screen.",
+        )
+
+
+def show_how_it_works_panel() -> None:
+    """Explain the app's AI, scoring, privacy, and fallback behavior."""
+    with st.expander("How AI SafeHome works"):
+        st.write(
+            "AI SafeHome reviews visible room conditions from a photo. It does not "
+            "diagnose a person or predict an individual person's fall risk."
+        )
+        st.markdown(
+            """
+            **1. See:** AI looks for visible hazards and marks their approximate location.
+
+            **2. Ask:** If the photo cannot confirm an important detail, the app asks a short follow-up question.
+
+            **3. Score:** Each confirmed concern receives a severity value, then the total is capped at 100.
+
+            **4. Act:** The app gives practical fixes, highlights uncertainty, and recommends human review.
+
+            **If AI or the database is unavailable:** the app shows a clearly labeled sample/fallback result and does not pretend it is a confirmed finding.
+
+            **Privacy:** Photos are used during the current check and are not saved to the database by the app.
+            """
         )
 
 
@@ -800,8 +852,21 @@ def render_hazard_card(hazard: Dict[str, Any], number: int) -> None:
 
         st.write("**Why it matters**")
         st.write(str(hazard.get("explanation", "This area may need human review.")))
+        st.write("**What the app noticed**")
+        st.write(str(hazard.get("evidence", "The photo provides limited visual evidence for this concern.")))
         st.write("**Suggested fix**")
         st.write(str(hazard.get("recommendation", "Review this area carefully.")))
+        details = []
+        if hazard.get("location"):
+            details.append(f"Approximate location: {hazard['location']}")
+        if hazard.get("confidence"):
+            details.append(f"AI confidence: {str(hazard['confidence']).capitalize()}")
+        if hazard.get("visibility"):
+            details.append(f"Photo visibility: {str(hazard['visibility']).capitalize()}")
+        if details:
+            st.caption(" · ".join(details))
+        if hazard.get("human_review_reason"):
+            st.info(f"Double-check in the real room: {hazard['human_review_reason']}")
 
 
 def show_score_explanation_card(score_breakdown: Dict[str, Any]) -> None:

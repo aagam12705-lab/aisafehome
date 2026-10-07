@@ -104,6 +104,7 @@ from src.ui import (
     safe_text,
     setup_page,
     show_accessibility_panel,
+    show_how_it_works_panel,
     show_read_aloud_button,
     show_risk_score_bar,
     show_score_explanation_card,
@@ -143,8 +144,16 @@ def show_landing_page() -> None:
 
     show_home_id_status(key_suffix="landing", allow_logout=True)
     show_privacy_and_ai_info()
+    show_how_it_works_panel()
 
-    if st.button("Start Safety Check", type="primary"):
+    if st.button("Quick Safety Check", type="primary", key="landing_quick_safety_check"):
+        reset_current_room_check()
+        st.session_state["quick_mode"] = True
+        go_to_page("room_selection")
+
+    st.caption("Upload one photo, answer only needed follow-up questions, and see the three most important fixes.")
+
+    if st.button("Full Safety Check", key="landing_full_safety_check"):
         reset_current_room_check()
         st.session_state["quick_mode"] = False
         go_to_page("room_selection")
@@ -1367,4 +1376,3 @@ def show_room_stats_page() -> None:
 
     if st.button("← Back to Landing Page"):
         go_to_page("landing")
-

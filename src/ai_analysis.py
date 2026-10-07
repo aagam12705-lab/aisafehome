@@ -354,6 +354,12 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
             "recommendation": str(
                 item.get("recommendation", "Review this area carefully.")
             ).strip(),
+            "human_review_reason": str(
+                item.get(
+                    "human_review_reason",
+                    "Confirm this concern in the real room before making changes.",
+                )
+            ).strip(),
         }
 
         try:

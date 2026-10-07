@@ -20,6 +20,8 @@ DEFAULT_SESSION_STATE = {
     "text_size": "Standard",
     "color_scheme": "System",
     "show_read_aloud": False,
+    "reduce_motion": False,
+    "compact_spacing": False,
     "database_save_complete": False,
     "database_save_id": None,
     "home_id": None,
