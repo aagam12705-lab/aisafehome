@@ -1,7 +1,7 @@
 """
 ai_analysis.py
 
-AI photo analysis for AI SafeHome.
+AI photo analysis for SafeHome AI.
 
 Default mode is fake/sample analysis so the app works without an API key.
 
@@ -23,7 +23,7 @@ load_dotenv()
 
 
 SYSTEM_PROMPT = """
-You are AI SafeHome, an educational home fall-hazard review assistant.
+You are SafeHome AI, an educational home fall-hazard review assistant.
 
 Your job:
 Analyze a room photo as if you are mentally walking through the room from the point of view of a person moving through it.
@@ -105,7 +105,7 @@ Judgment rules:
 Hazard scoring rules — severity-based room-inspector method:
 - Work like a careful home-safety inspector following a checklist, not like a person freely estimating risk.
 - First identify only hazards that are visible or strongly supported. Put uncertain items in follow-up questions instead of adding a new hazard.
-- Score each separate hazard from 1 to 20 based on its visible severity in the walking path: 1–4 = minor or off-path concern; 5–8 = low trip/slip concern; 9–12 = clear concern in a walking path; 13–16 = serious likely trip/slip concern; 17–20 = urgent, high-consequence concern such as a wet walking surface, unsafe stairs, or missing reliable hand support.
+- Score each separate hazard from 1 to 15 based on its visible severity in the walking path: 1–3 = minor or off-path concern; 4–6 = low trip/slip concern; 7–9 = clear concern in a walking path; 10–12 = serious likely trip/slip concern; 13–15 = urgent, high-consequence concern such as a wet walking surface, unsafe stairs, or missing reliable hand support.
 - Use the same severity band for the same clearly visible hazard in the same photo. Do not inflate a score just because the category sounds serious.
 - Score each separate hazard, even when two hazards have the same category. The app caps the final room score at 100.
 
@@ -332,7 +332,7 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
 
         # Category values remain a reliable backup for older, sample, or
         # incomplete AI responses that cannot provide a usable per-hazard score.
-        if ai_risk_points is None or not 1 <= ai_risk_points <= 20:
+        if ai_risk_points is None or not 1 <= ai_risk_points <= 15:
             risk_points = int(HAZARD_POINTS.get(category, 8))
             risk_points_source = "category backup"
         else:
@@ -422,7 +422,7 @@ def clean_ai_result(raw_result: Dict[str, Any]) -> Dict[str, Any]:
         skip_buffer_points = 0
 
     return {
-        "summary": summary or "AI SafeHome found possible room safety concerns.",
+        "summary": summary or "SafeHome AI found possible room safety concerns.",
         "hazards": hazards,
         "not_visible": clean_not_visible,
         "checklist_questions": checklist_questions,

@@ -1,4 +1,4 @@
-# AI SafeHome Pre-Submission Checklist
+# SafeHome AI Pre-Submission Checklist
 
 ## App quality
 

@@ -1,4 +1,4 @@
-# AI SafeHome Testing Guide
+# SafeHome AI Testing Guide
 
 Test only with staged, non-patient room photos. Do not use photos containing faces, addresses, mail, medicine bottles, or medical documents.
 
@@ -35,7 +35,13 @@ Test only with staged, non-patient room photos. Do not use photos containing fac
 - [ ] Test Standard, Large, and Extra Large text.
 - [ ] Test Light, Dark, System, and High Contrast modes.
 - [ ] Verify fields, tooltips, accessibility controls, and dropdowns remain readable in every mode.
-- [ ] Verify the app works without horizontal scrolling on a narrow phone screen.
+- [ ] Test in iPhone Safari at 375 px, 390 px, and 430 px widths.
+- [ ] Verify the page itself never scrolls sideways at any tested iPhone width.
+- [ ] Verify metric and before/after columns stack into readable full-width cards.
+- [ ] Verify stats tables become labeled mobile cards instead of requiring a horizontal swipe.
+- [ ] Verify the photo uploader, tabs, dropdowns, and long Room Names stay inside the screen.
+- [ ] Verify every email field sits below its aligned remove button and up to five recipients can still be edited.
+- [ ] Verify focusing an input does not trigger unexpected Safari page zoom.
 - [ ] Verify controls are comfortably tappable and keyboard reachable.
 - [ ] Verify Read Aloud buttons can be enabled and disabled in Accessibility.
 

@@ -1,6 +1,6 @@
-# AI SafeHome Data Policy
+# SafeHome AI Data Policy
 
-AI SafeHome is an educational home-safety app, not a medical service.
+SafeHome AI is an educational home-safety app, not a medical service.
 
 ## What people should upload
 
@@ -8,7 +8,7 @@ Use a photo of a room only. Before uploading, remove or avoid faces, names, addr
 
 ## Photo handling
 
-The app uses an uploaded photo during the current session for preview, photo-quality feedback, and hazard analysis. Photos are not saved to the AI SafeHome database and are not included in emailed summaries.
+The app uses an uploaded photo during the current session for preview, photo-quality feedback, and hazard analysis. Photos are not saved to the SafeHome AI database and are not included in emailed summaries.
 
 When real AI analysis is enabled, the photo is sent to the configured AI provider so it can be analyzed. A person should only upload a photo they are comfortable sending for that purpose.
 
@@ -38,6 +38,6 @@ People choose the email addresses that receive a summary. The app sends the text
 
 ## AI and safety limits
 
-AI SafeHome looks for possible visible environmental fall hazards. It may miss hazards, place a visual marker approximately, or misunderstand a photo. The risk score is not a medical diagnosis or an individual fall-risk prediction.
+SafeHome AI looks for possible visible environmental fall hazards. It may miss hazards, place a visual marker approximately, or misunderstand a photo. The risk score is not a medical diagnosis or an individual fall-risk prediction.
 
 For urgent or serious concerns, review the room with a qualified home-safety professional.

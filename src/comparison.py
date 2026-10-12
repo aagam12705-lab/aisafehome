@@ -1,7 +1,7 @@
 """
 comparison.py
 
-Before/after comparison helpers for AI SafeHome.
+Before/after comparison helpers for SafeHome AI.
 """
 
 from datetime import datetime
@@ -116,7 +116,7 @@ def build_before_after_summary_text(
     new_text = "\n".join(f"- {item}" for item in new_labels) or "- None"
 
     return f"""
-AI SafeHome Before/After Room Comparison
+SafeHome AI Before/After Room Comparison
 
 Before:
 Score: {before_score}/100

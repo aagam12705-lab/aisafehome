@@ -1,7 +1,7 @@
 """
 report_builder.py
 
-Builds printable/shareable report text for AI SafeHome.
+Builds printable/shareable report text for SafeHome AI.
 """
 
 from datetime import date
@@ -98,7 +98,7 @@ def build_report_text() -> str:
         else "Sample analysis — these hazards are not findings from the uploaded photo."
     )
     return f"""
-AI SafeHome Safety Report
+SafeHome AI Safety Report
 Date: {date.today().strftime('%B %d, %Y')}
 
 Room Checked:

@@ -1,4 +1,4 @@
-"""Session-state and navigation helpers for AI SafeHome."""
+"""Session-state and navigation helpers for SafeHome AI."""
 
 import streamlit as st
 

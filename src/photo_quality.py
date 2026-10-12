@@ -1,7 +1,7 @@
 """
 photo_quality.py
 
-Basic photo quality checks for AI SafeHome.
+Basic photo quality checks for SafeHome AI.
 
 This uses simple image heuristics:
 - resolution

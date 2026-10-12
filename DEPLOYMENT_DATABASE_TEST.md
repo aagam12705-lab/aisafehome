@@ -1,4 +1,4 @@
-# AI SafeHome Saved-Check Deployment Test
+# SafeHome AI Saved-Check Deployment Test
 
 Use this checklist after deploying the app with optional Supabase saving enabled.
 

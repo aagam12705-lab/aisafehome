@@ -1,4 +1,4 @@
-"""Application setup and one clear route table for AI SafeHome."""
+"""Application setup and one clear route table for SafeHome AI."""
 
 import importlib
 

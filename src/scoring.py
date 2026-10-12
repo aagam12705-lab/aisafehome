@@ -19,7 +19,7 @@ def calculate_ai_points(ai_hazards: List[Dict[str, Any]]) -> float:
 
         # The category table remains the backup if a response is missing or
         # produces an unusable per-hazard assessment.
-        if not 1 <= points <= 20:
+        if not 1 <= points <= 15:
             points = int(HAZARD_POINTS.get(category, 8))
 
         total += points

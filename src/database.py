@@ -1,4 +1,4 @@
-"""Supabase database helpers for AI SafeHome."""
+"""Supabase database helpers for SafeHome AI."""
 
 import os
 import re

@@ -1,7 +1,7 @@
 """
 trends.py
 
-Score trend helpers for AI SafeHome.
+Score trend helpers for SafeHome AI.
 """
 
 from datetime import datetime
@@ -93,7 +93,7 @@ def build_trend_summary_text(room_id: str, checks: List[Dict[str, Any]]) -> str:
         )
 
     return f"""
-AI SafeHome Room Score Trend
+SafeHome AI Room Score Trend
 
 Room Name:
 {room_id}

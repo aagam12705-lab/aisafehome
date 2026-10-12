@@ -1,7 +1,7 @@
 """
 ui.py
 
-Reusable Streamlit UI helpers and styling for AI SafeHome.
+Reusable Streamlit UI helpers and styling for SafeHome AI.
 """
 
 import base64
@@ -30,7 +30,7 @@ def show_html_frame(html_content: str, height: int) -> None:
 
 def setup_page() -> None:
     st.set_page_config(
-        page_title="AI SafeHome",
+        page_title="SafeHome AI",
         page_icon="🏠",
         layout="centered",
     )
@@ -146,9 +146,14 @@ def add_mobile_friendly_style() -> None:
             font-size:{base_font_size}px;
         }}
 
+        *, *::before, *::after {{
+            box-sizing:border-box;
+        }}
+
         .stApp {{
             background-color:var(--safe-bg);
             color:var(--safe-text);
+            overflow-x:hidden;
         }}
 
         .stApp, .plain-card, .step-card, [data-testid="stExpander"],
@@ -296,6 +301,7 @@ def add_mobile_friendly_style() -> None:
             border-top:1px solid var(--safe-border);
             color:var(--safe-text) !important;
             vertical-align:top;
+            overflow-wrap:anywhere;
         }}
 
         .safe-table tr:nth-child(even) td {{
@@ -514,6 +520,7 @@ def add_mobile_friendly_style() -> None:
             border-radius:10px;
             min-height:52px;
             padding:.8rem 1rem;
+            white-space:normal;
         }}
 
         [data-testid="stExpander"] summary *,
@@ -557,12 +564,156 @@ def add_mobile_friendly_style() -> None:
 
         @media screen and (max-width:480px) {{
             .block-container {{
-                padding-left:.85rem;
-                padding-right:.85rem;
+                width:100%;
+                max-width:100%;
+                padding-top:max(1.25rem, env(safe-area-inset-top));
+                padding-right:max(.85rem, env(safe-area-inset-right));
+                padding-bottom:max(2rem, env(safe-area-inset-bottom));
+                padding-left:max(.85rem, env(safe-area-inset-left));
             }}
 
             h1 {{
                 font-size:1.8rem !important;
+            }}
+
+            h2 {{
+                font-size:1.45rem !important;
+                margin-top:1.25rem !important;
+            }}
+
+            h3 {{
+                font-size:1.2rem !important;
+            }}
+
+            .plain-card,
+            .step-card,
+            .checklist-card,
+            .print-report,
+            .print-step-card {{
+                padding:.9rem;
+                margin:.8rem 0;
+                border-radius:13px;
+                overflow-wrap:anywhere;
+            }}
+
+            /* Streamlit keeps desktop columns side-by-side at some iPhone
+               widths. Stack them so metrics and comparison cards remain
+               readable without shrinking text or causing page overflow. */
+            [data-testid="stHorizontalBlock"] {{
+                flex-direction:column !important;
+                gap:.55rem !important;
+            }}
+
+            [data-testid="stHorizontalBlock"] > [data-testid="column"] {{
+                width:100% !important;
+                min-width:0 !important;
+                flex:1 1 100% !important;
+            }}
+
+            [data-testid="stMetric"] {{
+                width:100%;
+                padding:.75rem;
+            }}
+
+            /* Long account-tab labels wrap into full-width touch targets. */
+            [data-testid="stTabs"] [role="tablist"] {{
+                display:flex !important;
+                flex-wrap:wrap !important;
+                gap:.4rem !important;
+            }}
+
+            [data-testid="stTabs"] [role="tab"] {{
+                flex:1 1 10rem !important;
+                width:auto !important;
+                white-space:normal !important;
+                line-height:1.25 !important;
+            }}
+
+            /* Keep the uploader usable when iOS supplies a long camera or
+               Photo Library label. */
+            [data-testid="stFileUploaderDropzone"] {{
+                padding:.8rem !important;
+            }}
+
+            [data-testid="stFileUploaderDropzone"] > div {{
+                min-width:0 !important;
+                max-width:100% !important;
+                flex-direction:column !important;
+                align-items:stretch !important;
+                gap:.65rem !important;
+            }}
+
+            [data-testid="stFileUploaderDropzone"] button {{
+                width:100% !important;
+                margin:0 !important;
+                white-space:normal !important;
+            }}
+
+            input, textarea, [data-baseweb="select"] {{
+                width:100% !important;
+                max-width:100% !important;
+                min-width:0 !important;
+                font-size:{base_font_size}px !important;
+            }}
+
+            /* Convert wide statistics tables into labeled cards instead of
+               requiring a horizontal swipe inside the page. */
+            .safe-table-wrap {{
+                overflow:visible;
+                border:0;
+                background:transparent;
+            }}
+
+            .safe-table {{
+                display:block;
+                min-width:0;
+                width:100%;
+            }}
+
+            .safe-table thead {{
+                position:absolute;
+                width:1px;
+                height:1px;
+                padding:0;
+                margin:-1px;
+                overflow:hidden;
+                clip:rect(0, 0, 0, 0);
+                white-space:nowrap;
+                border:0;
+            }}
+
+            .safe-table tbody,
+            .safe-table tr,
+            .safe-table td {{
+                display:block;
+                width:100%;
+            }}
+
+            .safe-table tr {{
+                margin:0 0 .8rem;
+                border:1px solid var(--safe-border);
+                border-radius:13px;
+                overflow:hidden;
+                background:var(--safe-card);
+                box-shadow:0 4px 12px rgba(15, 23, 42, .06);
+            }}
+
+            .safe-table td {{
+                display:grid;
+                grid-template-columns:minmax(7.5rem, 42%) minmax(0, 1fr);
+                gap:.6rem;
+                padding:.7rem .8rem;
+                border-top:1px solid var(--safe-border);
+            }}
+
+            .safe-table td:first-child {{
+                border-top:0;
+            }}
+
+            .safe-table td::before {{
+                content:attr(data-label);
+                font-weight:800;
+                color:var(--safe-text);
             }}
 
             /* Recipient controls stay easy to use on a narrow phone: the
@@ -575,6 +726,36 @@ def add_mobile_friendly_style() -> None:
             [class*="st-key-recipient-row-"] [data-testid="column"] {{
                 width:100% !important;
                 flex:1 1 100% !important;
+            }}
+
+            [class*="st-key-recipient-row-"] [data-testid="column"]:nth-child(2) {{
+                display:flex !important;
+                justify-content:flex-end !important;
+                align-items:center !important;
+            }}
+
+            [class*="st-key-recipient-row-"] [data-testid="column"]:nth-child(2) .stButton,
+            [class*="st-key-recipient-row-"] [data-testid="column"]:nth-child(2) button {{
+                width:48px !important;
+                min-width:48px !important;
+                min-height:48px !important;
+                margin:0 !important;
+                padding:0 !important;
+            }}
+
+            .email-link-button {{
+                display:block;
+                width:100%;
+                min-height:52px;
+                text-align:center;
+                border-radius:12px;
+            }}
+        }}
+
+        @media (hover:none) and (pointer:coarse) {{
+            .stButton > button:hover,
+            .stDownloadButton > button:hover {{
+                transform:none;
             }}
         }}
 
@@ -609,7 +790,7 @@ def add_mobile_friendly_style() -> None:
 
 def show_accessibility_panel() -> None:
     with st.expander("Accessibility", expanded=False):
-        st.caption("Choose settings that make AI SafeHome easier to use. Changes apply right away.")
+        st.caption("Choose settings that make SafeHome AI easier to use. Changes apply right away.")
         st.selectbox(
             "Text size",
             ["Standard", "Large", "Extra Large"],
@@ -643,9 +824,9 @@ def show_accessibility_panel() -> None:
 
 def show_how_it_works_panel() -> None:
     """Explain the app's AI, scoring, privacy, and fallback behavior."""
-    with st.expander("How AI SafeHome works"):
+    with st.expander("How SafeHome AI works"):
         st.write(
-            "AI SafeHome reviews visible room conditions from a photo. It does not "
+            "SafeHome AI reviews visible room conditions from a photo. It does not "
             "diagnose a person or predict an individual person's fall risk."
         )
         st.markdown(
@@ -657,6 +838,10 @@ def show_how_it_works_panel() -> None:
             **3. Score:** Each confirmed concern receives a severity value, then the total is capped at 100.
 
             **4. Act:** The app gives practical fixes, highlights uncertainty, and recommends human review.
+
+            **Why this approach is different:** Instead of making every person complete the same long form, the photo supplies visible evidence and the app asks only about important uncertainties. Saved rechecks then turn a one-time result into visible room progress.
+
+            **Designed for seniors:** Large controls, plain language, four color modes, adjustable text, and optional Read Aloud make the same features easier to use without creating a separate reduced version of the app.
 
             **If AI or the database is unavailable:** the app shows a clearly labeled sample/fallback result and does not pretend it is a confirmed finding.
 
@@ -704,7 +889,8 @@ def render_styled_table(rows: list[Dict[str, Any]]) -> None:
     header_html = "".join(f"<th>{safe_text(column)}</th>" for column in columns)
     body_html = "".join(
         "<tr>" + "".join(
-            f"<td>{safe_text(row.get(column, ''))}</td>" for column in columns
+            f'<td data-label="{safe_text(column)}">{safe_text(row.get(column, ""))}</td>'
+            for column in columns
         ) + "</tr>"
         for row in rows
     )

@@ -1,7 +1,7 @@
 """
 fixes.py
 
-Top 5 fix recommendation logic for AI SafeHome.
+Top 5 fix recommendation logic for SafeHome AI.
 """
 
 from typing import Any, Dict, List, Set

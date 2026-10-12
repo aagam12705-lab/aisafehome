@@ -1,4 +1,4 @@
-# AI SafeHome Saved-Check Checklist
+# SafeHome AI Saved-Check Checklist
 
 ## Setup
 

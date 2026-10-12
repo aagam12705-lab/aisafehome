@@ -62,7 +62,7 @@ def create_mailto_link(to_email: str, subject: str, body: str) -> str:
 def build_email_footer() -> str:
     return """
 ---
-AI SafeHome Reminder:
+SafeHome AI Reminder:
 This summary is educational and does not diagnose medical risk, predict individual fall risk, or guarantee fall prevention.
 AI may miss hazards. Human review is recommended.
 Uploaded photos are not included in this email.
@@ -161,7 +161,7 @@ def show_email_summary_panel(
 
         if is_email_enabled():
             if st.button(
-                "Send Email from AI SafeHome",
+                "Send Email from SafeHome AI",
                 key=f"{key_prefix}_server_send",
                 type="primary",
             ):

@@ -118,7 +118,7 @@ def show_home_id_login_box(key_prefix: str = "home_id") -> None:
             if st.button("Email Reset Code", key=f"{key_prefix}_send_reset"):
                 try:
                     email, code = create_password_reset_code(existing)
-                    send_summary_email(email, "AI SafeHome password reset", f"Your reset code is {code}. It expires in 15 minutes.")
+                    send_summary_email(email, "SafeHome AI password reset", f"Your reset code is {code}. It expires in 15 minutes.")
                     st.success("A reset code was sent to this account's email address.")
                 except Exception as error:
                     st.error(str(error))

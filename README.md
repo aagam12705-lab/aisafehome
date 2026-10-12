@@ -1,6 +1,6 @@
-# AI SafeHome
+# SafeHome AI
 
-AI SafeHome helps older adults, families, and caregivers spot possible fall hazards in a room. A person takes or uploads one room photo, answers only the follow-up questions the photo cannot answer, and receives a risk score plus a plain-language safety plan.
+SafeHome AI helps older adults, families, and caregivers spot possible fall hazards in a room. A person takes or uploads one room photo, answers only the follow-up questions the photo cannot answer, and receives a risk score plus a plain-language safety plan.
 
 This is an educational home-safety tool. It does not diagnose medical conditions, calculate a person's medical fall risk, or guarantee fall prevention.
 

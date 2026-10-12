@@ -1,4 +1,4 @@
-"""Keep the deployed AI SafeHome Streamlit app active with a real browser visit."""
+"""Keep the deployed SafeHome AI Streamlit app active with a real browser visit."""
 
 from playwright.sync_api import sync_playwright
 
@@ -9,7 +9,7 @@ SESSION_WAIT_SECONDS = 30
 
 
 def main() -> None:
-    print(f"Opening AI SafeHome: {APP_URL}", flush=True)
+    print(f"Opening SafeHome AI: {APP_URL}", flush=True)
 
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(headless=True)
@@ -56,7 +56,7 @@ def main() -> None:
             # establishing its WebSocket connection and loading the app.
             page.wait_for_timeout(SESSION_WAIT_SECONDS * 1000)
 
-            print("AI SafeHome keep-alive visit completed successfully.", flush=True)
+            print("SafeHome AI keep-alive visit completed successfully.", flush=True)
         finally:
             browser.close()
             print("Browser closed cleanly.", flush=True)

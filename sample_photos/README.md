@@ -1,5 +1,5 @@
 # Sample Photos
-# AI SafeHome Sample Photo Rules
+# SafeHome AI Sample Photo Rules
 
 Use only staged, non-patient photos.
 

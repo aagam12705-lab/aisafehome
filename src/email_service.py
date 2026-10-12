@@ -1,7 +1,7 @@
 """
 email_service.py
 
-Privacy-safe server-side email sending for AI SafeHome.
+Privacy-safe server-side email sending for SafeHome AI.
 
 Uses Brevo transactional email API.
 """
@@ -60,7 +60,7 @@ def is_valid_email_address(email: str) -> bool:
 def get_brevo_settings() -> dict:
     api_key = get_env_value("BREVO_API_KEY")
     sender_email = get_env_value("BREVO_SENDER_EMAIL")
-    sender_name = get_env_value("BREVO_SENDER_NAME", "AI SafeHome")
+    sender_name = get_env_value("BREVO_SENDER_NAME", "SafeHome AI")
 
     if not api_key:
         raise RuntimeError("Missing BREVO_API_KEY.")

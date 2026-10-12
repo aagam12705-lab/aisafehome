@@ -1,4 +1,4 @@
-"""All Streamlit page handlers for AI SafeHome."""
+"""All Streamlit page handlers for SafeHome AI."""
 
 import importlib
 import io
@@ -123,11 +123,14 @@ from src.ui import (
 
 
 def show_landing_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.markdown(f'<div class="big-tagline">{TAGLINE}</div>', unsafe_allow_html=True)
 
     st.write(LANDING_EXPLANATION)
-    st.caption("For home-safety guidance only — not medical advice.")
+    st.caption(
+        "Built for older adults, families, and caregivers. "
+        "For home-safety guidance only — not medical advice."
+    )
 
     st.markdown(
         """
@@ -166,7 +169,7 @@ def show_landing_page() -> None:
 
 
 def show_room_selection_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Step 1: Choose a Room")
     if st.session_state.get("quick_mode"):
         show_step_card("Continue without signing in — Choose the room. No account or Room Name is needed unless you decide to save later.")
@@ -181,12 +184,8 @@ def show_room_selection_page() -> None:
         st.session_state["current_home_room_id"] = None
         go_to_page("photo_upload" if st.session_state.get("quick_mode") else "room_id_selection")
 
-    if st.button("← Back to Landing Page"):
-        go_to_page("landing")
-
-
 def show_room_id_selection_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Choose Room Name")
 
     room_type = st.session_state.get("room_type")
@@ -352,7 +351,7 @@ def render_hazard_location_guide(image_bytes: Optional[bytes], hazards: List[Dic
         st.image(image, caption="AI-marked hazard locations. Each numbered circle matches the hazard card below.", width="stretch")
 
 def show_photo_upload_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Step 2: Upload Room Photo")
     show_step_card("Step 2 of 6 — Upload or take a room photo.")
     st.caption(PHOTO_UPLOAD_PRIVACY_WARNING)
@@ -414,14 +413,17 @@ def show_photo_upload_page() -> None:
                 st.session_state["ai_result"] = ai_result
                 mark_new_room_check()
 
-            go_to_page("checklist" if st.session_state.get("quick_mode") else "ai_results")
+            # Quick mode removes account setup, not useful results. Everyone
+            # should see the marked photo and hazard explanations before the
+            # AI asks about details it could not confirm.
+            go_to_page("ai_results")
 
     if st.button("← Back"):
         go_to_page("room_selection" if st.session_state.get("quick_mode") else "room_id_selection")
 
 
 def show_ai_results_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Step 3: AI Results")
     show_step_card("Step 3 of 6 — Review possible hazards found by AI.")
 
@@ -504,7 +506,7 @@ def skip_follow_up_questions() -> None:
 
 
 def show_checklist_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Step 4: AI Follow-Up Questions")
     show_step_card("Step 4 of 6 — Answer only the questions the AI could not confirm from the photo.")
 
@@ -577,7 +579,7 @@ def show_checklist_page() -> None:
 
 
 def show_checklist_summary_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Follow-Up Summary")
 
     ai_result = st.session_state.get("ai_result") or {}
@@ -712,7 +714,7 @@ def show_current_check_comparison() -> None:
 
 
 def show_risk_score_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Step 5: Your Safety Plan")
     show_step_card("Step 5 of 6 — Review your score, then start with the three most important changes.")
 
@@ -766,7 +768,7 @@ def show_risk_score_page() -> None:
 
 
 def show_safety_report_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Step 6: Your Safety Plan & Report")
     st.caption("Save, share, or read the complete plan when you are ready.")
 
@@ -781,7 +783,7 @@ def show_safety_report_page() -> None:
     show_read_aloud_button(report_text, "safety_report")
 
     room_id = st.session_state.get("current_room_id") or "ROOM"
-    file_name = f"ai_safehome_report_{safe_filename_part(room_id)}.txt"
+    file_name = f"safehome_ai_report_{safe_filename_part(room_id)}.txt"
 
     st.download_button(
         label="Download Report",
@@ -791,14 +793,14 @@ def show_safety_report_page() -> None:
     )
 
     show_email_summary_panel(
-        summary_title="AI SafeHome Safety Report",
+        summary_title="SafeHome AI Safety Report",
         summary_text=report_text,
-        default_subject=f"AI SafeHome Safety Report - {room_id}",
+        default_subject=f"SafeHome AI Safety Report - {room_id}",
         key_prefix="safety_report_email",
     )
 
     show_share_summary_panel(
-        summary_title="AI SafeHome Safety Report",
+        summary_title="SafeHome AI Safety Report",
         summary_text=report_text,
         file_name=file_name,
         key_prefix="safety_report_share",
@@ -807,10 +809,6 @@ def show_safety_report_page() -> None:
     if st.button("Start New Safety Check"):
         reset_current_room_check()
         go_to_page("room_selection")
-
-    if st.button("← Back to Landing Page"):
-        go_to_page("landing")
-
 
 def show_after_fixes_photo_page() -> None:
     """Lets a person photograph the room again and compare photo-based findings."""
@@ -821,9 +819,9 @@ def show_after_fixes_photo_page() -> None:
             go_to_page("risk_score")
         return
 
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Photo Comparison After Fixes")
-    show_step_card("Take a new photo of the same room after making changes. AI SafeHome will compare possible hazards from both photos.")
+    show_step_card("Take a new photo of the same room after making changes. SafeHome AI will compare possible hazards from both photos.")
 
     st.image(before["photo_bytes"], caption="Before: original room photo", width="stretch")
     after_photo = st.file_uploader(
@@ -907,13 +905,11 @@ def show_after_fixes_photo_page() -> None:
 
 
 def show_saved_results_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("My Saved Room Checks")
 
     if not is_database_enabled():
         st.info("Saved room checks are not available right now.")
-        if st.button("← Back to Landing Page"):
-            go_to_page("landing")
         return
 
     if not get_logged_in_home_id():
@@ -959,10 +955,6 @@ def show_saved_results_page() -> None:
 
     if st.button("View Room-by-Room Stats", key="saved_results_view_room_stats"):
         go_to_page("room_stats")
-
-    if st.button("← Back to Landing Page"):
-        go_to_page("landing")
-
 
 def build_room_stats_email_text(room_stats: Dict[str, Any]) -> str:
     hazard_counts = room_stats.get("hazard_counts", {})
@@ -1135,7 +1127,7 @@ def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
             key=f"before_after_text_{room_id}",
         )
 
-        file_name = f"ai_safehome_before_after_{safe_filename_part(room_id)}.txt"
+        file_name = f"safehome_ai_before_after_{safe_filename_part(room_id)}.txt"
 
         st.download_button(
             label="Download Before/After Summary",
@@ -1146,16 +1138,16 @@ def show_before_after_room_comparison(home_id: str, room_id: str) -> None:
         )
 
     show_email_summary_panel(
-        summary_title="AI SafeHome Before/After Comparison",
+        summary_title="SafeHome AI Before/After Comparison",
         summary_text=comparison_text,
-        default_subject=f"AI SafeHome Before/After - {room_id}",
+        default_subject=f"SafeHome AI Before/After - {room_id}",
         key_prefix=f"before_after_email_{safe_filename_part(room_id)}",
     )
 
     show_share_summary_panel(
-        summary_title="AI SafeHome Before/After Comparison",
+        summary_title="SafeHome AI Before/After Comparison",
         summary_text=comparison_text,
-        file_name=f"ai_safehome_before_after_{safe_filename_part(room_id)}.txt",
+        file_name=f"safehome_ai_before_after_{safe_filename_part(room_id)}.txt",
         key_prefix=f"before_after_share_{safe_filename_part(room_id)}",
     )
 def show_room_health_trend_chart(home_id: str, room_id: str) -> None:
@@ -1208,25 +1200,23 @@ def show_room_health_trend_chart(home_id: str, room_id: str) -> None:
         st.download_button(
             label="Download Trend Summary",
             data=trend_text,
-            file_name=f"ai_safehome_trend_{safe_filename_part(room_id)}.txt",
+            file_name=f"safehome_ai_trend_{safe_filename_part(room_id)}.txt",
             mime="text/plain",
             key=f"trend_download_{safe_filename_part(room_id)}",
         )
 
     show_email_summary_panel(
-        summary_title="AI SafeHome Room Health Trend",
+        summary_title="SafeHome AI Room Health Trend",
         summary_text=trend_text,
-        default_subject=f"AI SafeHome Room Trend - {room_id}",
+        default_subject=f"SafeHome AI Room Trend - {room_id}",
         key_prefix=f"trend_email_{safe_filename_part(room_id)}",
     )
 def show_room_stats_page() -> None:
-    st.title("AI SafeHome")
+    st.title("SafeHome AI")
     st.subheader("Room-by-Room Stats")
 
     if not is_database_enabled():
         st.info("Saved room checks are not available right now.")
-        if st.button("← Back to Landing Page"):
-            go_to_page("landing")
         return
 
     if not get_logged_in_home_id():
@@ -1359,9 +1349,9 @@ def show_room_stats_page() -> None:
     room_stats_email_text = build_room_stats_email_text(selected_stats)
 
     show_email_summary_panel(
-        summary_title="AI SafeHome Room Stats Summary",
+        summary_title="SafeHome AI Room Stats Summary",
         summary_text=room_stats_email_text,
-        default_subject=f"AI SafeHome Room Stats - {selected_room_id}",
+        default_subject=f"SafeHome AI Room Stats - {selected_room_id}",
         key_prefix=f"room_stats_email_{safe_filename_part(selected_room_id)}",
     )
 
@@ -1373,6 +1363,3 @@ def show_room_stats_page() -> None:
         st.session_state["upload_nonce"] = st.session_state.get("upload_nonce", 0) + 1
         reset_checklist_progress()
         go_to_page("photo_upload")
-
-    if st.button("← Back to Landing Page"):
-        go_to_page("landing")

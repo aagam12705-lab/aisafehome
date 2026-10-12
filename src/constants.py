@@ -1,14 +1,14 @@
-APP_NAME = "AI SafeHome"
+APP_NAME = "SafeHome AI"
 TAGLINE = "Find home fall hazards before they become accidents."
 
 LANDING_EXPLANATION = (
-    "Upload a room photo, answer a few simple questions, and AI SafeHome "
+    "Upload a room photo, answer a few simple questions, and SafeHome AI "
     "will help identify possible fall hazards such as loose rugs, cords, clutter, "
     "poor lighting, stairs, slippery floors, and bathroom risks."
 )
 
 SAFETY_DISCLAIMER = (
-    "AI SafeHome is an educational home-safety tool. It does not diagnose medical "
+    "SafeHome AI is an educational home-safety tool. It does not diagnose medical "
     "conditions, predict individual fall risk, or guarantee fall prevention. AI may "
     "miss hazards. For serious safety concerns, ask a qualified professional to review the home."
 )
