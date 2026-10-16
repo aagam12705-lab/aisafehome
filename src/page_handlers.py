@@ -178,7 +178,7 @@ def show_room_selection_page() -> None:
 
     selected_room = st.radio("Which room are you checking?", ROOM_OPTIONS, index=0)
 
-    if st.button("Continue →", type="primary"):
+    if st.button("Continue →", type="primary", key="room_selection_continue"):
         st.session_state["room_type"] = selected_room
         st.session_state["current_room_id"] = None
         st.session_state["current_home_room_id"] = None

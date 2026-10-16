@@ -156,6 +156,15 @@ def add_mobile_friendly_style() -> None:
             overflow-x:hidden;
         }}
 
+        /* Streamlit scrolls the page inside stMain rather than the browser
+           document. Keep touch momentum enabled for iOS and avoid trapping
+           vertical swipes in the outer app container. */
+        [data-testid="stMain"] {{
+            -webkit-overflow-scrolling:touch;
+            touch-action:pan-y;
+            overscroll-behavior-y:contain;
+        }}
+
         .stApp, .plain-card, .step-card, [data-testid="stExpander"],
         .stButton > button, input, textarea {{
             transition:background-color .16s ease, color .16s ease, border-color .16s ease;
@@ -568,7 +577,10 @@ def add_mobile_friendly_style() -> None:
                 max-width:100%;
                 padding-top:max(1.25rem, env(safe-area-inset-top));
                 padding-right:max(.85rem, env(safe-area-inset-right));
-                padding-bottom:max(2rem, env(safe-area-inset-bottom));
+                /* Mobile Safari and installed web apps can overlay controls
+                   at the bottom of the viewport. The extra clearance lets
+                   the final button scroll completely above that toolbar. */
+                padding-bottom:max(7rem, calc(env(safe-area-inset-bottom) + 5rem));
                 padding-left:max(.85rem, env(safe-area-inset-left));
             }}
 
