@@ -105,6 +105,7 @@ from src.ui import (
     setup_page,
     show_accessibility_panel,
     show_how_it_works_panel,
+    show_open_on_phone_panel,
     show_read_aloud_button,
     show_risk_score_bar,
     show_score_explanation_card,
@@ -166,6 +167,8 @@ def show_landing_page() -> None:
 
     if st.button("View Room-by-Room Stats", key="landing_view_room_stats"):
         go_to_page("room_stats")
+
+    show_open_on_phone_panel()
 
 
 def show_room_selection_page() -> None:

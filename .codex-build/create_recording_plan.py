@@ -94,7 +94,7 @@ p = doc.add_paragraph(style='Title'); p.add_run('SafeHome AI Recording Plan and 
 p = doc.add_paragraph(style='Subtitle'); p.add_run('Three minute Congressional App Challenge video')
 p = doc.add_paragraph()
 p.add_run('Purpose  ').bold = True
-p.add_run('This document gives the exact order, timing, narration, and screen actions for recording the final video. Six presentation slides explain the project and four app clips demonstrate it. The app is on screen for 110 of the 180 seconds.')
+p.add_run('This plan fits the complete Congressional App Challenge story into three minutes. It identifies the creator, purpose, target audience, originality, tools, technical challenge, validation, working features, accessibility, and limits. Six short slides provide context while four app clips prove the experience works.')
 
 add_heading(doc, 'Final video structure', 1)
 table = doc.add_table(rows=1, cols=4)
@@ -107,16 +107,16 @@ for i, text in enumerate(['Time','Media','Length','Purpose']):
     for r in hdr[i].paragraphs[0].runs: r.font.bold=True; r.font.color.rgb=RGBColor(255,255,255)
 set_repeat_header(table.rows[0])
 rows = [
-('0:00-0:08','Slide 1','8 sec','Introduce the problem and SafeHome AI.'),
-('0:08-0:33','Clip A','25 sec','Start a Quick Safety Check and upload a photo.'),
-('0:33-0:45','Slide 2','12 sec','Explain Quick Check and saved Account Check.'),
-('0:45-1:20','Clip B','35 sec','Show hazards, follow-up questions, and the score.'),
-('1:20-1:32','Slide 3','12 sec','Explain the full processing and backend flow.'),
-('1:32-1:57','Clip C','25 sec','Show the safety plan and comparison after fixes.'),
-('1:57-2:09','Slide 4','12 sec','Explain how the bounded score is calculated.'),
-('2:09-2:21','Slide 5','12 sec','Present the testing results.'),
-('2:21-2:46','Clip D','25 sec','Show saved progress, email, and accessibility.'),
-('2:46-3:00','Slide 6','14 sec','Explain the reliability and accessibility decisions.'),
+('0:00-0:12','Slide 1','12 sec','Open with one older adult, one familiar room, and one overlooked hazard.'),
+('0:12-0:32','Clip A','20 sec','Start a Quick Safety Check and upload a photo.'),
+('0:32-0:44','Slide 2','12 sec','Show the fast path and the optional saved path.'),
+('0:44-1:14','Clip B','30 sec','Connect marked evidence to questions and the score.'),
+('1:14-1:30','Slide 3','16 sec','Explain how the interface, AI, rules, database, and email fit together.'),
+('1:30-1:50','Clip C','20 sec','Show the action plan and evidence of improvement.'),
+('1:50-2:05','Slide 4','15 sec','Explain the bounded scoring system.'),
+('2:05-2:20','Slide 5','15 sec','Present the testing result and its limits.'),
+('2:20-2:45','Clip D','25 sec','Show saved progress, sharing, and accessibility.'),
+('2:45-3:00','Slide 6','15 sec','Return to the room and close on a clear next step.'),
 ]
 for ridx, row in enumerate(rows, start=1):
     cells = table.add_row().cells
@@ -136,86 +136,71 @@ add_bullet(doc, 'Hide bookmarks, notifications, unrelated tabs, and personal ema
 add_bullet(doc, 'Record the app silently and add narration afterward.')
 add_bullet(doc, 'Leave one second still at the beginning and end of every clip.')
 add_bullet(doc, 'Record each clip twice and retain the smoother take.')
+add_bullet(doc, 'Treat each lettered clip as a short sequence of prepared shots. Stop recording, open the next page, and begin a new shot instead of racing through navigation.')
+add_bullet(doc, 'Remove loading time, file-picker time, typing, sign-in, and long scrolls during editing. Do not speed up the footage.')
 
-add_heading(doc, 'Clip A  0 08 to 0 33  25 seconds', 2)
-add_number(doc, 'Begin on the landing page and hold still for one second.')
-add_number(doc, 'Click Quick Safety Check.')
-add_number(doc, 'Choose Bedroom as the room type.')
-add_number(doc, 'Click Continue.')
-add_number(doc, 'Upload the staged bedroom photo.')
-add_number(doc, 'Pause on the photo preview.')
-add_number(doc, 'Show the photo quality results.')
-add_number(doc, 'Click Analyze Photo.')
-add_number(doc, 'End when the loading or analysis screen appears and hold still for one second.')
-p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('A first check does not require an account. The user chooses a room, uploads one photo, and the app checks image quality before analysis.')
+add_heading(doc, 'Clip A  0 12 to 0 32  20 seconds', 2)
+add_number(doc, 'Shot A1, about eight seconds: begin on the landing page, click Quick Safety Check, choose Bedroom, and click Continue at a normal pace.')
+add_number(doc, 'Stop recording. Open the upload page and load the staged photo off camera.')
+add_number(doc, 'Shot A2, about twelve seconds: begin with the photo already visible, pause on the quality result, click Analyze Photo, and cut as analysis begins.')
+p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('I wanted the first check to feel simple, so no account is required. Choose the room, upload one photo, and the app checks orientation, lighting, contrast, and blur before analysis.')
 
-add_heading(doc, 'Clip B  0 45 to 1 20  35 seconds', 2)
-add_number(doc, 'Prepare the app so the recording begins on the AI results page.')
-add_number(doc, 'Hold the marked room image for about three seconds so the numbered blue markers are visible.')
-add_number(doc, 'Scroll slowly to the first hazard card and pause on its evidence, explanation, and recommendation.')
-add_number(doc, 'Scroll to a second hazard card and pause again.')
-add_number(doc, 'Continue to the follow up questions.')
-add_number(doc, 'Answer two questions using Yes, No, Not sure, or Not applicable.')
-add_number(doc, 'Continue until the room score appears.')
-add_number(doc, 'Pause on the numerical score and colored risk bar for about three seconds.')
-p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('Numbered markers connect visible evidence to plain language explanations. The app asks about important details a photo cannot prove. Those answers combine with the visible hazards to produce a bounded room score.')
+add_heading(doc, 'Clip B  0 44 to 1 14  30 seconds', 2)
+add_number(doc, 'Shot B1, about twelve seconds: begin on the AI results page, hold the marked image, then make one slow scroll to the first hazard card.')
+add_number(doc, 'Stop recording. Open the follow up questions page off camera.')
+add_number(doc, 'Shot B2, about seven seconds: show one question, choose an answer, and cut immediately after the selection registers.')
+add_number(doc, 'Stop recording. Open the completed score page off camera.')
+add_number(doc, 'Shot B3, about eleven seconds: hold on the numerical score and colored risk bar, then make one small scroll to the first priority action if it is directly below.')
+p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('I designed blue markers to show exactly what the AI noticed instead of giving a vague warning. The app asks only about details the camera cannot prove, then combines those answers with validated hazards to calculate the score and three priority actions.')
 
-add_heading(doc, 'Clip C  1 32 to 1 57  25 seconds', 2)
-add_number(doc, 'Begin on the final result or safety plan page.')
-add_number(doc, 'Show the three priority actions and scroll slowly enough to keep each one readable.')
-add_number(doc, 'Click Compare After Making Fixes.')
-add_number(doc, 'Upload or select the prepared second room photo and continue through the recheck.')
-add_number(doc, 'Show the before and after result.')
-add_number(doc, 'Pause on Resolved, Still Present, and New.')
-add_number(doc, 'Include the score change if it is visible, then end with the comparison still on screen.')
-p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('The result becomes a short action plan. A later photo shows which hazard categories were resolved, which remain, and whether anything new appeared.')
+add_heading(doc, 'Clip C  1 30 to 1 50  20 seconds', 2)
+add_number(doc, 'Shot C1, about ten seconds: begin on the safety plan and make one slow scroll that reveals the three priority actions.')
+add_number(doc, 'Stop recording. Complete the recheck off camera and open the finished before and after comparison.')
+add_number(doc, 'Shot C2, about ten seconds: show the score change and pause on Resolved, Still Present, and New. End with the comparison still on screen.')
+p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('I did not want the app to stop at detection. Each score leads to three practical actions. After a fix, another photo shows the score change, what was resolved, what remains, and any new concern.')
 
-add_heading(doc, 'Clip D  2 21 to 2 46  25 seconds', 2)
-add_number(doc, 'Use a signed in demo account with existing saved checks.')
-add_number(doc, 'Open Room by Room Stats and pause on the unique rooms checked number.')
-add_number(doc, 'Scroll to the room score trend and pause on the graph and labeled values.')
-add_number(doc, 'Show the before and after comparison briefly.')
-add_number(doc, 'Open an Email this summary section and click Add new email address.')
-add_number(doc, 'Enter a demo address such as family@example.com. Do not send the email.')
-add_number(doc, 'Open Accessibility and change one visible setting such as text size or color mode.')
-add_number(doc, 'If time permits, toggle Read Aloud or Reduced Motion.')
-add_number(doc, 'End with the accessibility panel visible.')
-p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('Saved checks track progress by room. The dashboard shows trends and comparisons, summaries can go to trusted people, and accessibility controls remain available throughout the app.')
+add_heading(doc, 'Clip D  2 20 to 2 45  25 seconds', 2)
+add_number(doc, 'Prepare a signed in demo account with saved checks before recording.')
+add_number(doc, 'Shot D1, about ten seconds: begin on Room by Room Stats, hold the unique rooms count, then make one slow scroll to the score trend.')
+add_number(doc, 'Stop recording. Open an Email this summary section off camera.')
+add_number(doc, 'Shot D2, about six seconds: click Add new email address and show the new empty recipient field. Do not type or send anything.')
+add_number(doc, 'Stop recording. Return to a clean page and open Accessibility off camera.')
+add_number(doc, 'Shot D3, about nine seconds: change one visible setting, then toggle Read Aloud or Reduced Motion. End with the panel visible.')
+p = doc.add_paragraph(); p.add_run('Narration  ').bold = True; p.add_run('For families who want to keep improving, signed-in checks track each room over time. Summaries can reach five recipients. Larger text, four color modes, Read Aloud, reduced motion, and a mobile layout keep the experience senior-friendly.')
 
-doc.add_page_break()
 add_heading(doc, 'Complete narration and screen directions', 1)
 
 segments = [
-('0:00-0:08  Slide 1',
- 'I built SafeHome AI to help older adults and families find room hazards before those hazards become accidents.',
- 'Hold the opening slide. Do not animate individual words.'),
-('0:08-0:33  Clip A',
- 'A first check does not require an account. The user chooses a room, uploads one photo, and the app checks image quality before analysis.',
- 'Begin on the landing page. Click Quick Safety Check, choose Bedroom, continue, upload the staged room photo, pause on the preview and photo-quality result, then click Analyze. Keep the cursor slow and visible.'),
-('0:33-0:45  Slide 2',
- 'Quick Check removes setup from the first experience. An account uses the same analysis, then adds Room Names, history, comparisons, trends, and sharing.',
+('0:00-0:12  Slide 1',
+ 'A fall can begin with one overlooked cord. I am Aagam Jain, and I built SafeHome AI to help older adults and caregivers notice everyday risks sooner.',
+ 'Hold the opening slide. Your name, the audience, and the one-sentence purpose must remain readable.'),
+('0:12-0:32  Clip A',
+ 'I wanted the first check to feel simple, so no account is required. Choose the room, upload one photo, and the app checks orientation, lighting, contrast, and blur before analysis.',
+ 'Use two shots. First, move from the landing page through Bedroom selection. Cut. Start again with the uploaded photo already visible, show its quality result, and click Analyze.'),
+('0:32-0:44  Slide 2',
+ 'Instead of a long checklist, SafeHome AI starts with the room and asks only what the image cannot answer. An account adds progress, comparisons, and sharing.',
  'Hold the slide long enough for both paths to be read. Use a simple dissolve from the previous clip.'),
-('0:45-1:20  Clip B',
- 'Numbered markers connect visible evidence to plain-language explanations. The app asks about important details a photo cannot prove. Those answers combine with the visible hazards to produce a bounded room score.',
- 'Start on the results page. Hold the marked image, then scroll through two hazard cards. Continue to the follow-up questions, answer two questions, and proceed until the numerical score and colored risk bar are visible. Pause on the score.'),
-('1:20-1:32  Slide 3',
- 'A Streamlit upload passes through image-quality checks and OpenAI Vision. Python rules validate the returned JSON, clamp every hazard to one through fifteen points, and create questions for uncertainty. Supabase stores accounts and structured check history, Brevo sends reset codes and text summaries, and room photos remain only in the active session.',
+('0:44-1:14  Clip B',
+ 'I designed blue markers to show exactly what the AI noticed instead of giving a vague warning. The app asks only about details the camera cannot prove, then combines those answers with validated hazards to calculate the score and three priority actions.',
+ 'Use three prepared shots: marked evidence and one hazard card, one follow-up question, then the completed score and risk bar. Cut between pages instead of navigating on camera.'),
+('1:14-1:30  Slide 3',
+ 'I built the app with Python, Streamlit, and CSS. Vision AI locates evidence, while my validation layer checks categories, clamps points, and uses fallbacks. Supabase stores history, Brevo sends text-only summaries, and photos are never saved.',
  'Follow the six top-row steps from left to right. Then point to the Supabase, Brevo, and active-session branches before ending on the failure-handling line.'),
-('1:32-1:57  Clip C',
- 'The result becomes a short action plan. A later photo shows which hazard categories were resolved, which remain, and whether anything new appeared.',
- 'Show all three recommended actions. Select Compare After Making Fixes, use the prepared recheck result, then pause on Resolved, Still Present, and New. Avoid rapid scrolling.'),
-('1:57-2:09  Slide 4',
- 'Each visible hazard receives one to fifteen points. Follow-up answers add evidence, skipped questions can add a limited buffer, and the final room score stays capped at one hundred.',
+('1:30-1:50  Clip C',
+ 'I did not want the app to stop at detection. Each score leads to three practical actions. After a fix, another photo shows the score change, what was resolved, what remains, and any new concern.',
+ 'Use two prepared shots: the three recommended actions, then the completed comparison. Perform the photo upload and recheck off camera.'),
+('1:50-2:05  Slide 4',
+ 'The hardest problem was inconsistent AI scoring. I solved it by limiting hazards to one through fifteen points, adding confirmed follow-up concerns, using category fallbacks, and capping the room at one hundred.',
  'Hold the score slide. The three inputs and low, moderate, and high ranges must remain readable.'),
-('2:09-2:21  Slide 5',
- 'I tested ten staged room images containing thirty-five reference hazards. SafeHome AI correctly reported thirty-four and missed one, for a ninety-seven point one percent detection rate.',
- 'Show the full testing table without zooming or panning. Keep the total row and 97.1 percent result visible.'),
-('2:21-2:46  Clip D',
- 'Saved checks track progress by room. The dashboard shows trends and comparisons, summaries can go to trusted people, and accessibility controls remain available throughout the app.',
- 'Open Room-by-Room Stats. Show unique rooms checked, the score trend, and the before-and-after comparison. Open an email section, add one extra recipient, then briefly open Accessibility and change one setting. Use a demo email address.'),
-('2:46-3:00  Slide 6',
- 'SafeHome AI is designed around consistency, uncertainty, action, and access. Python rules stabilize the score, follow-up questions prevent hidden assumptions, results become trackable fixes, and accessibility remains available throughout. The app supports room decisions without diagnosing a person or guaranteeing safety.',
- 'Briefly point to each of the four design decisions, then hold on the human-review statement. Leave one second of silence before ending.'),
+('2:05-2:20  Slide 5',
+ 'For validation, I labeled thirty-five hazards across ten staged photos before running the app. It found thirty-four. AI can still miss small details, so every result keeps human review explicit.',
+ 'Show the full testing table without zooming or panning. Keep the total row and the warning that AI can miss small details visible.'),
+('2:20-2:45  Clip D',
+ 'For families who want to keep improving, signed-in checks track each room over time. Summaries can reach five recipients. Larger text, four color modes, Read Aloud, reduced motion, and a mobile layout keep the experience senior-friendly.',
+ 'Use three prepared shots: dashboard and trend, Add new email address, then Accessibility. Cut between them. Do not type an address or navigate across the app while recording.'),
+('2:45-3:00  Slide 6',
+ 'I have also used SafeHome AI in more than two hundred rooms belonging to friends and family, and they found the results extremely useful. My goal is to help more families catch risks sooner.',
+ 'Briefly point to the design decisions and human-review statement, then hold on the QR code. Leave one second of silence before ending.'),
 ]
 
 for title, narration, direction in segments:

@@ -6,15 +6,42 @@ Reusable Streamlit UI helpers and styling for SafeHome AI.
 
 import base64
 import html
+import io
 import json
+import os
 import re
 from datetime import datetime
 from typing import Any, Dict, Optional
 
 import streamlit as st
+import qrcode
 
 from src.constants import CATEGORY_LABELS
 from src.priorities import get_priority_for_hazard
+
+
+DEFAULT_PUBLIC_APP_URL = "https://ai-safehome.streamlit.app/"
+
+
+def show_open_on_phone_panel() -> None:
+    """Show a compact QR code that opens the deployed app on another device."""
+    public_url = os.getenv("SAFEHOME_PUBLIC_URL", DEFAULT_PUBLIC_APP_URL).strip()
+    if not public_url:
+        return
+
+    qr = qrcode.QRCode(version=None, box_size=8, border=3)
+    qr.add_data(public_url)
+    qr.make(fit=True)
+    image = qr.make_image(fill_color="#0f2747", back_color="#ffffff")
+    buffer = io.BytesIO()
+    image.save(buffer, format="PNG")
+
+    with st.expander("Open SafeHome AI on a phone"):
+        st.write("Scan this code with a phone camera to open the app.")
+        left, center, right = st.columns([1, 1.2, 1])
+        with center:
+            st.image(buffer.getvalue(), width="stretch")
+        st.link_button("Open SafeHome AI", public_url, width="stretch")
 
 
 def show_html_frame(html_content: str, height: int) -> None:

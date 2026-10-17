@@ -6,12 +6,14 @@ import { Presentation, PresentationFile } from "@oai/artifact-tool";
 const workspaceDir = "/Users/aagamjain/Desktop/ai-safehome";
 const buildDir = path.join(workspaceDir, ".codex-build/presentation");
 const outputDir = path.join(workspaceDir, "output/presentation");
-const skillDir = "/Users/aagamjain/.codex/plugins/cache/openai-primary-runtime/presentations/26.1013.11914/skills/presentations";
+const skillDir = "/Users/aagamjain/.codex/plugins/cache/openai-primary-runtime/presentations/26.1015.12040/skills/presentations";
 const pythonExecutable = "/Users/aagamjain/.cache/codex-runtimes/codex-primary-runtime/dependencies/python/bin/python3";
-const finalPptx = path.join(outputDir, "SafeHome_AI_Video_Slides_and_Recording_Plan.pptx");
+const finalPptx = path.join(outputDir, "SafeHome_AI_CAC_Slides_Annotated_Final_v3.pptx");
+const qrPath = path.join(buildDir, "assets/safehome-app-qr.png");
 
 await fs.mkdir(buildDir, { recursive: true });
 await fs.mkdir(outputDir, { recursive: true });
+const qrBytes = await fs.readFile(qrPath);
 
 const deck = Presentation.create({ slideSize: { width: 1280, height: 720 } });
 const C = {
@@ -63,39 +65,39 @@ function addNotes(slide, timing, narration, nextClip = "") {
 // 1 - Title
 {
   const s = deck.slides.add(); s.background.fill = C.pale; addLine(s,0,0,1280,9,C.blue);
-  addText(s,"A room-safety check\nfrom one photo",66,120,710,150,{fontSize:48,bold:true,color:C.navy});
-  addText(s,"Designed for older adults, families, and anyone helping make a home safer.",66,298,690,64,{fontSize:22,color:C.slate});
-  addLine(s,66,396,500,7,C.blue);
+  addText(s,"SafeHome AI",66,104,700,82,{fontSize:54,bold:true,color:C.navy});
+  addLine(s,66,214,500,7,C.blue);
+  addText(s,"A fall can begin with one overlooked cord and lead to injury, lost confidence, and less independence.",66,262,690,116,{fontSize:28,bold:true,color:C.navy});
+  addText(s,"Created by Aagam Jain",66,424,600,48,{fontSize:27,bold:true,color:C.blue});
   addRect(s,850,126,300,390,C.lightBlue,C.grid,true);
-  addText(s,"START HERE",850,190,300,42,{fontSize:18,bold:true,color:C.blue,alignment:"center"});
-  addText(s,"Take or upload\na room photo",890,262,220,90,{fontSize:27,bold:true,color:C.navy,alignment:"center"});
-  addLine(s,930,382,140,5,C.mint);
-  addText(s,"The app explains what it notices",890,412,220,70,{fontSize:19,color:C.slate,alignment:"center"});
+  addText(s,"1 room photo",890,214,220,52,{fontSize:29,bold:true,color:C.navy,alignment:"center"});
+  addText(s,"↓",980,296,40,40,{fontSize:28,bold:true,color:C.mint,alignment:"center"});
+  addText(s,"Identified fall risks\nand ways to take action",878,358,244,92,{fontSize:21,bold:true,color:C.navy,alignment:"center"});
   addText(s,"1",1190,675,28,20,{fontSize:10,color:C.gray,alignment:"right"});
-  addNotes(s,"0:00-0:08 (8 seconds)","I built SafeHome AI to help older adults and families find room hazards before those hazards become accidents.","0:08-0:33 - Clip A: Start a Quick Safety Check, choose a room, upload a photo, and begin analysis. Narration: A first check does not require an account. The user chooses a room, uploads one photo, and the app checks image quality before analysis.");
+  addNotes(s,"0:00-0:12 (12 seconds)","A fall can begin with one overlooked cord. I am Aagam Jain, and I built SafeHome AI to help older adults and caregivers notice everyday risks sooner.","0:12-0:32 - Clip A: Use two prepared shots. First show room selection. Cut to the uploaded photo and begin analysis.");
 }
 
 // 2 - Two ways to begin
 {
-  const s=deck.slides.add(); base(s,"Choose the path that fits","The safety check is the same. Saving a room is optional.",2);
+  const s=deck.slides.add(); base(s,"Start with the room, not a long checklist","The photo handles visible evidence. The user answers only what the image cannot prove.",2);
   addLine(s,640,205,2,360,C.grid);
-  addText(s,"FASTEST",90,206,120,42,{fontSize:16,bold:true,color:C.blue});
+  addText(s,"NO ACCOUNT REQUIRED",90,206,210,42,{fontSize:16,bold:true,color:C.blue});
   addText(s,"Quick Safety Check",90,250,475,46,{fontSize:29,bold:true,color:C.navy});
   const quick=[["1","Choose room type"],["2","Upload one photo"],["3","Get three priority actions"]];
   quick.forEach((item,i)=>{ const y=318+i*72; addRect(s,90,y,430,54,C.white,C.grid,true); addText(s,item[0],104,y+7,38,38,{fontSize:18,bold:true,color:C.blue,alignment:"center"}); addText(s,item[1],150,y+7,350,38,{fontSize:19,bold:true,color:C.dark}); if(i<2){addLine(s,304,y+54,2,13,C.blue); addText(s,"▼",294,y+61,22,18,{fontSize:10,bold:true,color:C.blue,alignment:"center"});} });
-  addText(s,"FOR TRACKING",714,206,160,42,{fontSize:16,bold:true,color:C.blue});
-  addText(s,"Account Check",714,250,475,46,{fontSize:29,bold:true,color:C.navy});
+  addText(s,"OPTIONAL ACCOUNT",714,206,190,42,{fontSize:16,bold:true,color:C.blue});
+  addText(s,"Keep the progress",714,250,475,46,{fontSize:29,bold:true,color:C.navy});
   const saved=[["1","Sign in and select Room Name"],["2","Run the same safety check"],["3","Track trends and share summaries"]];
   saved.forEach((item,i)=>{ const y=318+i*72; addRect(s,714,y,430,54,C.white,C.grid,true); addText(s,item[0],728,y+7,38,38,{fontSize:18,bold:true,color:C.blue,alignment:"center"}); addText(s,item[1],774,y+7,350,38,{fontSize:19,bold:true,color:C.dark}); if(i<2){addLine(s,928,y+54,2,13,C.blue); addText(s,"▼",918,y+61,22,18,{fontSize:10,bold:true,color:C.blue,alignment:"center"});} });
   addLine(s,90,548,1098,2,C.grid);
   addRect(s,250,558,780,58,C.lightBlue,C.blue,true);
-  addText(s,"BOTH PATHS  →  photo review  →  validated hazards  →  follow-up questions  →  room score",270,568,740,36,{fontSize:18,bold:true,color:C.blue,alignment:"center"});
-  addNotes(s,"0:33-0:45 (12 seconds)","Quick Check removes setup from the first experience. An account uses the same analysis, then adds Room Names, history, comparisons, trends, and sharing.","0:45-1:20 - Clip B: Show the marked photo, two hazard cards, answer follow-up questions, and reveal the score. Narration: Numbered markers connect visible evidence to plain-language explanations. Questions cover important details the photo cannot prove, and the result ends with a bounded room score.");
+  addText(s,"AN ACCOUNT ADDS  saved progress  •  comparisons  •  sharing",270,568,740,36,{fontSize:18,bold:true,color:C.blue,alignment:"center"});
+  addNotes(s,"0:32-0:44 (12 seconds)","Instead of a long checklist, SafeHome AI starts with the room and asks only what the image cannot answer. An account adds progress, comparisons, and sharing.","0:44-1:14 - Clip B: Use three prepared shots: marked evidence, one follow-up question, and the completed score.");
 }
 
 // 3 - AI pipeline
 {
-  const s=deck.slides.add(); base(s,"From photo to saved progress","One end-to-end flow connects the interface, Vision AI, validation, Supabase, and Brevo.",3);
+  const s=deck.slides.add(); base(s,"The system and the problem I solved","Python rules keep an AI-assisted score explainable and consistent.",3);
   const flow=[
     ["STREAMLIT","receives photo\nand Room Type"],
     ["QUALITY GATE","orientation • light\ncontrast • blur"],
@@ -105,7 +107,7 @@ function addNotes(slide, timing, narration, nextClip = "") {
     ["RESULT","score • risk bar\nthree-step plan"],
   ];
   flow.forEach((item,i)=>{ const x=50+i*204; addRect(s,x,178,174,124,C.white,C.grid,true); addText(s,item[0],x+10,192,154,26,{fontSize:15,bold:true,color:C.blue,alignment:"center"}); addText(s,item[1],x+12,226,150,58,{fontSize:16,color:C.dark,alignment:"center"}); if(i<5)addText(s,"→",x+174,220,30,36,{fontSize:24,bold:true,color:C.blue,alignment:"center"}); });
-  addText(s,"Validated result branches only when the user chooses to save or share.",66,326,1148,30,{fontSize:18,bold:true,color:C.navy,alignment:"center"});
+  addText(s,"My main challenge was variable AI scoring. The model identifies evidence; my Python layer controls every stored result.",66,326,1148,30,{fontSize:18,bold:true,color:C.navy,alignment:"center"});
   [276,640,1004].forEach(x=>{ addLine(s,x,356,2,38,C.blue); addText(s,"▼",x-10,384,22,18,{fontSize:10,bold:true,color:C.blue,alignment:"center"}); });
   addRect(s,126,406,300,142,C.lightBlue,C.blue,true);
   addText(s,"SUPABASE",146,422,260,28,{fontSize:18,bold:true,color:C.blue,alignment:"center"});
@@ -116,8 +118,8 @@ function addNotes(slide, timing, narration, nextClip = "") {
   addRect(s,854,406,300,142,C.lightBlue,C.blue,true);
   addText(s,"ACTIVE SESSION",874,422,260,28,{fontSize:18,bold:true,color:C.blue,alignment:"center"});
   addText(s,"current photo + analysis state\nconnect pages during the check\nphoto is not saved",874,456,260,74,{fontSize:16,color:C.dark,alignment:"center"});
-  addText(s,"Failure handling  •  invalid AI values use tested defaults  •  database and email errors become readable messages  •  final score never exceeds 100",66,576,1148,42,{fontSize:16,bold:true,color:C.navy,alignment:"center"});
-  addNotes(s,"1:20-1:32 (12 seconds)","A Streamlit upload passes through image-quality checks and OpenAI Vision. Python rules validate the returned JSON, clamp every hazard to one through fifteen points, and create questions for uncertainty. Supabase stores accounts and structured check history, Brevo sends reset codes and text summaries, and room photos remain only in the active session.","1:32-1:57 - Clip C: Show the three-step safety plan, then compare a second photo after fixes. Narration: The result becomes a short action plan. A later photo shows which hazard categories were resolved, which remain, and whether anything new appeared.");
+  addText(s,"Built with Python, Streamlit, CSS, OpenAI Vision, Supabase, and Brevo. Invalid AI values use tested defaults, and room photos are not stored.",66,576,1148,42,{fontSize:16,bold:true,color:C.navy,alignment:"center"});
+  addNotes(s,"1:14-1:30 (16 seconds)","I built the app with Python, Streamlit, and CSS. Vision AI locates evidence, while my validation layer checks categories, clamps points, and uses fallbacks. Supabase stores history, Brevo sends text-only summaries, and photos are never saved.","1:30-1:50 - Clip C: Use two prepared shots: the safety plan and the completed before-and-after comparison.");
 }
 
 // 4 - Adaptive questions
@@ -136,27 +138,16 @@ function addNotes(slide, timing, narration, nextClip = "") {
 
 // 5 - Scoring
 {
-  const s=deck.slides.add(); base(s,"How the score stays consistent","Three inputs contribute to one room score, capped at 100.",4);
-  addText(s,"VISIBLE HAZARDS",80,222,300,30,{fontSize:15,bold:true,color:C.blue});
-  addText(s,"1-15 points each",80,258,300,50,{fontSize:27,bold:true,color:C.navy});
-  addText(s,"FOLLOW-UP CONCERNS",476,222,300,30,{fontSize:15,bold:true,color:C.mint});
-  addText(s,"Weighted by answer",476,258,300,50,{fontSize:27,bold:true,color:C.navy});
-  addText(s,"SKIPPED QUESTIONS",872,222,300,30,{fontSize:15,bold:true,color:C.amber});
-  addText(s,"0-15 point buffer",872,258,300,50,{fontSize:27,bold:true,color:C.navy});
-  addText(s,"+",398,255,42,42,{fontSize:34,bold:true,color:C.slate,alignment:"center"});
-  addText(s,"+",794,255,42,42,{fontSize:34,bold:true,color:C.slate,alignment:"center"});
-  addLine(s,80,348,1092,2,C.grid);
-  addText(s,"0-29",92,402,260,42,{fontSize:28,bold:true,color:C.mint,alignment:"center"});
-  addText(s,"Low",92,449,260,36,{fontSize:20,color:C.slate,alignment:"center"});
-  addText(s,"30-59",510,402,260,42,{fontSize:28,bold:true,color:C.amber,alignment:"center"});
-  addText(s,"Moderate",510,449,260,36,{fontSize:20,color:C.slate,alignment:"center"});
-  addText(s,"60-100",928,402,260,42,{fontSize:28,bold:true,color:C.red,alignment:"center"});
-  addText(s,"High",928,449,260,36,{fontSize:20,color:C.slate,alignment:"center"});
-  addRect(s,154,504,972,66,C.white,C.grid,true);
-  addText(s,"WORKED EXAMPLE",174,514,170,22,{fontSize:14,bold:true,color:C.blue});
-  addText(s,"Visible hazards 28   +   Follow-up concerns 12   +   Skip buffer 0   =   Room score 40  Moderate",174,538,930,24,{fontSize:18,bold:true,color:C.navy});
-  addText(s,"Fallback rule: if an AI point value is missing or invalid, the app uses the category's tested default. Final score = min(100, total).",80,590,1092,38,{fontSize:17,bold:true,color:C.navy,alignment:"center"});
-  addNotes(s,"1:57-2:09 (12 seconds)","Each visible hazard receives one to fifteen points. Follow-up answers add evidence, skipped questions can add a limited buffer, and the final room score stays capped at one hundred.");
+  const s=deck.slides.add(); base(s,"The hardest problem was inconsistent AI scoring","I kept the model's judgment inside four rules that my Python code enforces.",4);
+  addRect(s,74,184,490,352,C.redPale,C.red,true);
+  addText(s,"THE PROBLEM",108,216,420,30,{fontSize:17,bold:true,color:C.red});
+  addText(s,"The same type of hazard could receive a different point value when the AI analyzed another photo.",108,270,400,130,{fontSize:28,bold:true,color:C.navy});
+  addText(s,"That variation made room scores harder to compare.",108,420,400,60,{fontSize:20,color:C.slate});
+  addText(s,"→",588,320,70,54,{fontSize:42,bold:true,color:C.blue,alignment:"center"});
+  const guards=[["1","Limit each hazard to 1-15 points"],["2","Add only confirmed follow-up concerns"],["3","Use a tested category fallback"],["4","Cap the final room score at 100"]];
+  guards.forEach((item,i)=>{const y=174+i*94; addRect(s,686,y,492,72,C.white,C.grid,true); addText(s,item[0],704,y+15,44,42,{fontSize:20,bold:true,color:C.blue,alignment:"center"}); addText(s,item[1],758,y+12,392,48,{fontSize:20,bold:true,color:C.navy});});
+  addText(s,"The AI identifies evidence. The application controls the score.",74,574,1104,42,{fontSize:22,bold:true,color:C.blue,alignment:"center"});
+  addNotes(s,"1:50-2:05 (15 seconds)","The hardest problem was inconsistent AI scoring. I solved it by limiting hazards to one through fifteen points, adding confirmed follow-up concerns, using category fallbacks, and capping the room at one hundred.");
 }
 
 // 6 - Testing & validation, user-provided actual results
@@ -176,8 +167,8 @@ function addNotes(slide, timing, narration, nextClip = "") {
   t.cells.block({row:11,column:0,rowCount:1,columnCount:5}).assign({fill:C.lightBlue,textStyle:{fontFamily:FONT,fontSize:15,bold:true,color:C.navy},anchor:"middle",margins:{left:10,right:10,top:4,bottom:4}});
   t.cells.block({row:1,column:0,rowCount:11,columnCount:1}).assign({textStyle:{fontFamily:FONT,fontSize:14,color:C.dark,alignment:"left"}});
   t.cells.block({row:11,column:0,rowCount:1,columnCount:1}).assign({textStyle:{fontFamily:FONT,fontSize:15,bold:true,color:C.navy,alignment:"left"}});
-  addText(s,"34 of 35 reference hazards detected  |  97.1% in this test set",66,620,1120,34,{fontSize:18,bold:true,color:C.blue});
-  addNotes(s,"2:09-2:21 (12 seconds)","I tested ten staged room images containing thirty-five reference hazards. SafeHome AI correctly reported thirty-four and missed one, for a ninety-seven point one percent detection rate.","2:21-2:46 - Clip D: Show the room dashboard, score trend, before-and-after comparison, add an email recipient, and briefly open Accessibility. Narration: Saved checks track progress by room. The dashboard shows trends and comparisons, summaries can go to trusted people, and accessibility controls remain available throughout the app.");
+  addText(s,"34 of 35 reference hazards detected  |  AI can still miss small details, so human review remains necessary",66,620,1120,34,{fontSize:17,bold:true,color:C.blue});
+  addNotes(s,"2:05-2:20 (15 seconds)","For validation, I labeled thirty-five hazards across ten staged photos before running the app. It found thirty-four. AI can still miss small details, so every result keeps human review explicit.","2:20-2:45 - Clip D: Use three prepared shots: dashboard and trend, add a recipient field, and Accessibility.");
 }
 
 // 7 - Architecture
@@ -200,28 +191,29 @@ function addNotes(slide, timing, narration, nextClip = "") {
 
 // 8 - Close
 {
-  const s=deck.slides.add(); base(s,"Design decisions that make the app usable","Each decision solves a specific risk in an AI-assisted safety tool.",6);
-  const decisions=[
-    ["CONSISTENCY","AI proposes 1-15 points.\nPython clamps values, applies tested fallbacks, and caps the room at 100."],
-    ["UNCERTAINTY","The model does not guess hidden facts.\nIt turns important unknowns into simple follow-up questions."],
-    ["ACTION","Results become three prioritized fixes,\nimpact estimates, and before/after comparisons."],
-    ["ACCESS","Large controls, four color modes, Read Aloud, reduced motion, and a mobile-first layout."],
-  ];
-  const accentColors=[C.blue,C.mint,C.amber,C.red];
-  decisions.forEach((item,i)=>{ const x=66+(i%2)*574; const y=184+Math.floor(i/2)*190; addRect(s,x,y,540,154,C.white,C.grid,true); addLine(s,x,y,8,154,accentColors[i]); addText(s,item[0],x+28,y+18,488,28,{fontSize:17,bold:true,color:accentColors[i]}); addText(s,item[1],x+28,y+54,488,78,{fontSize:18,color:C.dark}); });
-  addRect(s,126,580,1028,52,C.lightBlue,C.blue,true);
-  addText(s,"Human review stays explicit: the app supports room decisions; it does not diagnose a person or guarantee safety.",150,588,980,36,{fontSize:18,bold:true,color:C.navy,alignment:"center"});
-  addNotes(s,"2:46-3:00 (14 seconds)","SafeHome AI is designed around consistency, uncertainty, action, and access. Python rules stabilize the score, follow-up questions prevent hidden assumptions, results become trackable fixes, and accessibility remains available throughout. The app supports room decisions without diagnosing a person or guaranteeing safety.");
+  const s=deck.slides.add(); base(s,"More than 200 rooms checked","Friends and family used the results to notice concerns and decide what to address first.",6);
+  addText(s,"200+",82,184,430,150,{fontSize:104,bold:true,color:C.blue,alignment:"center"});
+  addText(s,"rooms belonging to\nfriends and family",82,332,430,92,{fontSize:28,bold:true,color:C.navy,alignment:"center"});
+  addLine(s,590,184,2,330,C.grid);
+  addText(s,"What I heard",666,194,420,40,{fontSize:19,bold:true,color:C.mint});
+  addText(s,"The interface felt friendly, the results used simple language, and users suggested potential features.",666,246,470,112,{fontSize:29,bold:true,color:C.navy});
+  addText(s,"My goal",666,376,420,36,{fontSize:19,bold:true,color:C.amber});
+  addText(s,"Help make falls less of a common fear for older adults and their families.",666,426,470,82,{fontSize:26,bold:true,color:C.navy});
+  addRect(s,66,566,870,66,C.lightBlue,C.blue,true);
+  addText(s,"AI can still miss small details. SafeHome AI keeps human review part of every result.",88,578,826,42,{fontSize:18,bold:true,color:C.navy,alignment:"center"});
+  s.images.add({blob:qrBytes,contentType:"image/png",alt:"QR code linking to the SafeHome AI app",fit:"contain",position:{left:1028,top:540,width:108,height:108}});
+  addText(s,"TRY THE APP",982,650,198,20,{fontSize:12,bold:true,color:C.blue,alignment:"center"});
+  addNotes(s,"2:45-3:00 (15 seconds)","I have also used SafeHome AI in more than two hundred rooms belonging to friends and family, and they found the results extremely useful. My goal is to help more families catch risks sooner.");
 }
 
 // 9 - Production appendix, clips A-D
 {
-  const s=deck.slides.add(); base(s,"Clip recording plan","Four app clips receive 110 of the video's 180 seconds.",7,true);
+  const s=deck.slides.add(); base(s,"Clip recording plan","Four app clips receive 95 of the video's 180 seconds.",7,true);
   const rows=[
     ["Clip","Length","Screen and action","Place after"],
-    ["A","25 sec","Quick Check: choose room, upload photo, show quality check, and start analysis.","Slide 1"],
-    ["B","35 sec","Results: marked photo, two hazard cards, follow-up questions, score and risk bar.","Slide 2"],
-    ["C","25 sec","Action: three-step safety plan, recheck photo, and resolved/still/new comparison.","Slide 3"],
+    ["A","20 sec","Quick Check: choose room, upload photo, show quality check, and start analysis.","Slide 1"],
+    ["B","30 sec","Results: marked photo, two hazard cards, one follow-up question, score and risk bar.","Slide 2"],
+    ["C","20 sec","Action: three-step safety plan, recheck photo, and resolved/still/new comparison.","Slide 3"],
     ["D","25 sec","Saved progress: dashboard, trend, comparison, email recipient, Accessibility.","Slide 5"],
   ];
   const t=s.tables.add({rows:rows.length,columns:4,left:66,top:188,width:1120,height:320,columnWidths:[92,110,690,228],values:rows});
@@ -257,11 +249,11 @@ function addNotes(slide, timing, narration, nextClip = "") {
   const s=deck.slides.add(); base(s,"Three-minute assembly timeline","Six slides explain the idea; four app clips prove it works.",8,true);
   const rows=[
     ["Time","Media","Time","Media"],
-    ["0:00-0:08","Slide 1","1:32-1:57","Clip C"],
-    ["0:08-0:33","Clip A","1:57-2:09","Slide 4"],
-    ["0:33-0:45","Slide 2","2:09-2:21","Slide 5"],
-    ["0:45-1:20","Clip B","2:21-2:46","Clip D"],
-    ["1:20-1:32","Slide 3","2:46-3:00","Slide 6"],
+    ["0:00-0:12","Slide 1","1:30-1:50","Clip C"],
+    ["0:12-0:32","Clip A","1:50-2:05","Slide 4"],
+    ["0:32-0:44","Slide 2","2:05-2:20","Slide 5"],
+    ["0:44-1:14","Clip B","2:20-2:45","Clip D"],
+    ["1:14-1:30","Slide 3","2:45-3:00","Slide 6"],
   ];
   const t=s.tables.add({rows:rows.length,columns:4,left:120,top:184,width:1040,height:390,columnWidths:[180,340,180,340],values:rows});
   t.borders.assign({style:"solid",fill:C.grid,width:1});
@@ -294,6 +286,6 @@ const result=await finalizePresentation({
   explicitTotalSlideCount:6,
   fontPolicy:{basis:"design",families:["Aptos"]},
   verifyArtifactToolImport:true,
-  receiptPath:path.join(stagingDir,"validation.json"),
+  receiptPath:path.join(stagingDir,"cac-annotated-final-v3-validation.json"),
 });
 console.log(JSON.stringify({finalPptx,result},null,2));
